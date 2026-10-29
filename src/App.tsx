@@ -190,7 +190,15 @@ export const App: React.FC = () => {
   const [circles, setCircles] = useState<AdashiCircle[]>(() => {
     try {
       const saved = localStorage.getItem('bitfriend_adashi_circles');
-      return saved ? JSON.parse(saved) : INITIAL_CIRCLES;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (JSON.stringify(parsed).includes('Kaduna') || JSON.stringify(parsed).includes('Barci')) {
+          localStorage.setItem('bitfriend_adashi_circles', JSON.stringify(INITIAL_CIRCLES));
+          return INITIAL_CIRCLES;
+        }
+        return parsed;
+      }
+      return INITIAL_CIRCLES;
     } catch {
       return INITIAL_CIRCLES;
     }

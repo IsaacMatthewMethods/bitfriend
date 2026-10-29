@@ -57,7 +57,7 @@ export const MarketSimulationLab: React.FC<MarketSimulationLabProps> = ({
 
   const runAdashiSimulation = () => {
     setIsAutoSimulating(true);
-    setSimLog(['Initiated 5-Round Adashi Simulation for Kasuwan Barci Traders...']);
+    setSimLog(['Initiated 5-Round Adashi Simulation for Market Cooperative Traders...']);
     soundController.playPaymentChime();
 
     const members = ['Fatima Sani', 'Ibrahim Bello', 'Amina Garba (You)', 'Yusuf Danjuma', 'Usman Aliyu'];
@@ -319,7 +319,7 @@ export const MarketSimulationLab: React.FC<MarketSimulationLabProps> = ({
               </button>
             </div>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-              Simulates a full weekly rotation for Kasuwan Barci traders, distributing 12,500 sats per round.
+              Simulates a full weekly rotation for market cooperative traders, distributing 12,500 sats per round.
             </p>
 
             <div style={{ maxHeight: '180px', overflowY: 'auto', background: 'var(--bg-primary)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '6px', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>

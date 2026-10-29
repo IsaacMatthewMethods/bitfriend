@@ -3,15 +3,15 @@
 ### Offline-First Bitcoin & Chaumian Ecash for African Grassroots Commerce
 **Version:** 1.0.0 (Production / Hackathon Release)  
 **Target Platform:** Mobile-First Progressive Web App (PWA)  
-**Primary Event:** Btrust x GDG Kaduna DevFest  
-**Document Status:** Approved / Ready for Execution
+**Target Event:** Global Bitcoin & Web3 Hackathon 2026  
+**Document Status:** Approved / Production Ready
 
 ---
 
 ## 1. Executive Summary & Vision
 
 ### 1.1 Problem Statement
-Across Nigeria and Sub-Saharan Africa, grassroots informal commerce accounts for over **80% of total employment** and **60% of GDP**. In major commerce hubs like **Kasuwan Barci** and **Kaduna Central Market**, daily retail transactions face two structural failures:
+Across Nigeria and Sub-Saharan Africa, grassroots informal commerce accounts for over **80% of total employment** and **60% of GDP**. In major open commerce hubs, daily retail transactions face two structural failures:
 1. **Telecom & Banking Network Fragility:** High cellular traffic, power grid collapse, and bank gateway congestion cause POS card terminals and mobile USSD transfers to fail regularly. Merchants lose sales or risk handing goods over on delayed "uncredited bank alerts."
 2. **Devastating Fiat Inflation:** The Nigerian Naira (NGN) devalued by over 70% in recent years, with real inflation exceeding 30%. Traditional rotating savings and credit associations (**Adashi / Esusu / Ajo**) lose substantial purchasing power before participants receive their pooled payouts.
 
@@ -27,8 +27,8 @@ Across Nigeria and Sub-Saharan Africa, grassroots informal commerce accounts for
 
 | Persona | Role / Context | Core Pain Points | BitFriend Value Delivered |
 | :--- | :--- | :--- | :--- |
-| **Amina Garba** | Fabric & Brocade Vendor, Kasuwan Barci | Peak market hours jam cell towers; bank transfer alerts take 20+ minutes to arrive. | Instant offline QR/tap receipt with Hausa voice confirmation; zero gateway fees. |
-| **Musa Abdullahi** | Keke-NAPEP (Tricycle) Driver, Doka Union | Carries cash for change; loses 10-15% of daily revenue to Naira devaluation; risk of physical theft. | Micro-satoshi payments (1 sat ≈ ₦1.58); participates in daily Adashi pool to buy spare tires. |
+| **Amina Garba** | Fabric & Brocade Vendor, Central Market | Peak market hours jam cell towers; bank transfer alerts take 20+ minutes to arrive. | Instant offline QR/tap receipt with Hausa voice confirmation; zero gateway fees. |
+| **Musa Abdullahi** | Tricycle Driver, Urban Transport Union | Carries cash for change; loses 10-15% of daily revenue to Naira devaluation; risk of physical theft. | Micro-satoshi payments (1 sat ≈ ₦1.58); participates in daily Adashi pool to buy spare tires. |
 | **Ibrahim Bello** | Cooperative Leader / Adashi Treasurer | Record-keeping is manual on paper ledgers; members dispute contribution orders and currency devaluation. | Automated round tracking; transparent satoshi payouts; printable thermal audit slips and CSV export. |
 
 ---
