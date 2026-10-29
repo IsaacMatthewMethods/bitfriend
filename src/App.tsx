@@ -15,7 +15,6 @@ import {
   Check,
   RefreshCw,
   QrCode,
-  Clock,
   ArrowDownLeft,
   ArrowUpRight,
   TrendingUp,
@@ -27,13 +26,14 @@ import {
   Plus,
   Radio,
   Key,
-  Smartphone,
-  Sliders,
   MessageSquare,
   Upload,
   Lock,
   KeyRound,
-  Building2
+  Building2,
+  Home,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import type { Language, CashuProof, PaymentTransaction, AdashiCircle } from './types';
 import { getTranslation } from './utils/translations';
@@ -75,8 +75,6 @@ import { MintSettingsModal } from './components/MintSettingsModal';
 import { VaultBackupModal } from './components/VaultBackupModal';
 import { LightningAddressModal } from './components/LightningAddressModal';
 import { MultiMintMonitor } from './components/MultiMintMonitor';
-import { InteractivePitchDeck } from './components/InteractivePitchDeck';
-import { MarketSimulationLab } from './components/MarketSimulationLab';
 import { SmsBeamModal } from './components/SmsBeamModal';
 import { PinLockModal } from './components/PinLockModal';
 import { BitChatView } from './components/chat/BitChatView';
@@ -183,10 +181,10 @@ export const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('en');
   const [isOffline, setIsOffline] = useState<boolean>(() => !navigator.onLine);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'pos' | 'bitchat' | 'bank' | 'adashi' | 'vault' | 'history' | 'lab'>('pos');
+  const [activeTab, setActiveTab] = useState<'wallet' | 'pos' | 'bitchat' | 'adashi' | 'vault'>('wallet');
+  const [hideBalance, setHideBalance] = useState<boolean>(false);
   
   // Modals
-  const [showPitchModal, setShowPitchModal] = useState<boolean>(false);
   const [showQrScanner, setShowQrScanner] = useState<boolean>(false);
   const [scannerTarget, setScannerTarget] = useState<'pos' | 'vault'>('pos');
   const [showCreateAdashi, setShowCreateAdashi] = useState<boolean>(false);
@@ -196,7 +194,6 @@ export const App: React.FC = () => {
   const [showBackupModal, setShowBackupModal] = useState<boolean>(false);
   const [showLnAddressModal, setShowLnAddressModal] = useState<boolean>(false);
   const [showMultiMintModal, setShowMultiMintModal] = useState<boolean>(false);
-  const [showSimulationLab, setShowSimulationLab] = useState<boolean>(false);
   const [showSmsBeam, setShowSmsBeam] = useState<boolean>(false);
   const [showPinModal, setShowPinModal] = useState<boolean>(false);
   const [pinModalMode, setPinModalMode] = useState<'unlock' | 'setup'>('unlock');
@@ -208,7 +205,6 @@ export const App: React.FC = () => {
   const [activeMintUrl, setActiveMintUrl] = useState<string>(getCustomMint());
   const [vaultBackedUp, setVaultBackedUp] = useState<boolean>(() => isVaultBackedUp());
   const [hasWebLN, setHasWebLN] = useState<boolean>(false);
-  const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
   const vaultFileRef = React.useRef<HTMLInputElement | null>(null);
 
   // Balances & Proofs
@@ -287,17 +283,9 @@ export const App: React.FC = () => {
     // Check WebLN
     setHasWebLN(isWebLNAvailable());
 
-    // Listen for PWA beforeinstallprompt
-    const handleInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
     };
   }, []);
 
@@ -748,15 +736,6 @@ export const App: React.FC = () => {
     setTimeout(() => setAdashiNotice(''), 5000);
   };
 
-  // Trigger PWA install
-  const handleInstallApp = () => {
-    if (!installPrompt) return;
-    const promptEvent = installPrompt as unknown as { prompt: () => void; userChoice: Promise<{ outcome: string }> };
-    promptEvent.prompt();
-    promptEvent.userChoice.then(() => {
-      setInstallPrompt(null);
-    });
-  };
 
   // Restore vault from JSON backup file
   const handleRestoreBackupFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -817,37 +796,24 @@ export const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Header & Brand */}
-      <header className="app-header">
+      {/* Flagship Mobile Profile Header */}
+      <header className="app-header" style={{ borderRadius: '20px', padding: '12px 16px' }}>
         <div className="brand-section">
-          <div className="brand-logo">₿</div>
+          <div className="brand-logo" style={{ width: '40px', height: '40px', fontSize: '20px', borderRadius: '12px' }}>₿</div>
           <div className="brand-info">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h1 style={{ margin: 0 }}>{t.appTitle}</h1>
-              <span className="badge-pill" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
-                v2.4 Super-App
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '15px', fontWeight: 800, color: '#fff' }}>Bello Ibrahim</span>
+              <span style={{ color: '#10b981', display: 'flex', alignItems: 'center' }} title="Verified Merchant">
+                <Check size={14} strokeWidth={3} />
               </span>
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              The Grassroots African Bitcoin & Ecash Operating System
+            <div style={{ fontSize: '11px', color: 'var(--btc-orange)', fontFamily: 'var(--font-mono)' }}>
+              ⚡ bello.bitfriend.me
             </div>
           </div>
         </div>
 
         <div className="header-controls">
-          {/* PWA Install Button */}
-          {installPrompt && (
-            <button
-              className="ctrl-btn"
-              style={{ background: 'var(--btc-orange)', color: 'black', fontWeight: 700 }}
-              onClick={handleInstallApp}
-              title="Install BitFriend PWA on Phone"
-            >
-              <Smartphone size={15} />
-              Install
-            </button>
-          )}
-
           {/* Online/Offline Toggle */}
           <button
             className={`network-pill ${isOffline ? 'offline' : 'online'}`}
@@ -856,44 +822,46 @@ export const App: React.FC = () => {
               soundController.playClick();
             }}
             title={t.toggleNetwork}
+            style={{ padding: '5px 10px', fontSize: '11px' }}
           >
             <span className="status-dot"></span>
-            {isOffline ? <WifiOff size={14} /> : <Wifi size={14} />}
-            {isOffline ? t.offline : t.online}
+            {isOffline ? <WifiOff size={13} /> : <Wifi size={13} />}
+            {isOffline ? 'Offline' : 'Online'}
           </button>
 
           {/* Language Toggle */}
           <button
             className="ctrl-btn"
-            style={{ fontWeight: 600 }}
+            style={{ padding: '6px 10px', fontSize: '12px', fontWeight: 600 }}
             onClick={() => {
               setLang(lang === 'en' ? 'ha' : 'en');
               soundController.playClick();
             }}
-            title="Switch Language (Hausa / English)"
           >
-            {lang === 'en' ? '🇳🇬 Hausa' : '🇬🇧 English'}
+            {lang === 'en' ? '🇳🇬 HA' : '🇬🇧 EN'}
           </button>
 
           {/* Sound Toggle */}
           <button
             className="ctrl-btn"
+            style={{ padding: '6px 10px' }}
             onClick={() => {
               setSoundEnabled(!soundEnabled);
               soundController.playClick();
             }}
             title={soundEnabled ? 'Mute Voice Receipts' : 'Enable Voice Receipts'}
           >
-            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
           </button>
 
           {/* Security & PIN Lock Button */}
           <button
             className="ctrl-btn"
             style={{
+              padding: '6px 10px',
+              fontSize: '12px',
               borderColor: hasConfiguredPin ? 'rgba(16, 185, 129, 0.5)' : 'rgba(247, 147, 26, 0.5)',
               color: hasConfiguredPin ? '#10b981' : 'var(--btc-orange)',
-              gap: '4px',
             }}
             onClick={() => {
               if (hasConfiguredPin) {
@@ -908,250 +876,213 @@ export const App: React.FC = () => {
             }}
             title={hasConfiguredPin ? 'Lock Ecash Vault (AES-GCM)' : 'Set 6-Digit Encryption PIN'}
           >
-            {hasConfiguredPin ? <Lock size={15} /> : <KeyRound size={15} />}
-            <span style={{ fontSize: '11px', fontWeight: 600 }}>{hasConfiguredPin ? 'Locked' : 'Set PIN'}</span>
-          </button>
-
-          {/* Judge Pitch Deck Button */}
-          <button
-            className="ctrl-btn"
-            style={{ borderColor: 'var(--btc-orange)', color: 'var(--btc-orange)', fontWeight: 700 }}
-            onClick={() => {
-              setShowPitchModal(true);
-              soundController.playClick();
-            }}
-          >
-            <Award size={15} />
-            Pitch Deck
+            {hasConfiguredPin ? <Lock size={14} /> : <KeyRound size={14} />}
           </button>
         </div>
       </header>
 
-      {/* Hackathon Judge Interactive Spotlight Hub */}
-      <div className="hackathon-judge-banner">
-        <div className="banner-text">
-          <span className="badge">🏆 Hackathon Evaluation Hub</span>
-          <span>
-            {lang === 'ha'
-              ? 'Gwada duk fasalolin BitFriend: biyan kudi ba tare da intanet ba, BitChat, tara kudin Adashi, da cirewa zuwa OPay/PalmPay.'
-              : 'Evaluate all BitFriend modules: zero-data offline ecash, encrypted Nostr BitChat, communal Adashi, and instant bank off-ramp.'}
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button
-            className="btn-secondary"
-            style={{ padding: '5px 12px', fontSize: '11px', borderColor: isOffline ? '#c084fc' : '#10b981', color: isOffline ? '#c084fc' : '#10b981' }}
-            onClick={() => {
-              setIsOffline(!isOffline);
-              soundController.playClick();
-            }}
-          >
-            {isOffline ? <Wifi size={13} style={{ display: 'inline', marginRight: '4px' }} /> : <WifiOff size={13} style={{ display: 'inline', marginRight: '4px' }} />}
-            {isOffline ? 'Restore Network' : 'Simulate 100% Outage'}
-          </button>
-          <button
-            className="btn-secondary"
-            style={{ padding: '5px 12px', fontSize: '11px', borderColor: 'var(--btc-orange)', color: 'var(--btc-orange)' }}
-            onClick={() => {
-              setShowPitchModal(true);
-              soundController.playClick();
-            }}
-          >
-            <Award size={13} style={{ display: 'inline', marginRight: '4px' }} />
-            Architecture Deck
-          </button>
-          <button
-            className="btn-secondary"
-            style={{ padding: '5px 12px', fontSize: '11px' }}
-            onClick={() => {
-              setActiveTab('lab');
-              soundController.playClick();
-            }}
-          >
-            <Sliders size={13} style={{ display: 'inline', marginRight: '4px' }} />
-            Stress Test Lab
-          </button>
-        </div>
-      </div>
-
-      {/* Total Balance Card */}
-      <div className="balance-card">
-        <div>
-          <div className="balance-label">Total Balance (Sats & Naira)</div>
-          <div className="balance-sats mono-num">
-            {totalSats.toLocaleString()}
-            <span className="unit">sats</span>
-          </div>
-          <div className="balance-fiat mono-num">
-            ≈ ₦{totalNgn.toLocaleString()} NGN
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '8px' }}>
-              (1 BTC = ₦{(BTC_TO_NGN_RATE / 1000000).toFixed(1)}M)
-            </span>
-          </div>
-        </div>
-
-        <div className="balance-sub-badges">
-          <div className="sub-badge" style={{ borderColor: 'rgba(139, 92, 246, 0.4)' }}>
-            <span className="lbl" style={{ color: '#C4B5FD' }}>
-              <ShieldCheck size={12} style={{ display: 'inline', marginRight: '4px' }} />
-              {t.totalVaultBalance} (Offline)
-            </span>
-            <span className="val mono-num" style={{ color: '#DDD6FE' }}>
-              {vaultSats.toLocaleString()} sats (₦{satsToNgn(vaultSats).toLocaleString()})
-            </span>
-          </div>
-
-          <div className="sub-badge" style={{ borderColor: 'rgba(247, 147, 26, 0.4)' }}>
-            <span className="lbl" style={{ color: 'var(--btc-orange)' }}>
-              <Zap size={12} style={{ display: 'inline', marginRight: '4px' }} />
-              Lightning Balance (Online)
-            </span>
-            <span className="val mono-num" style={{ color: '#FDE68A' }}>
-              {lightningSats.toLocaleString()} sats (₦{satsToNgn(lightningSats).toLocaleString()})
-            </span>
-          </div>
-        </div>
-
-        {/* Quick Action Super-App Command Grid */}
-        <div className="quick-action-grid">
-          <div
-            className={`quick-action-card bank-action ${activeTab === 'bank' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('bank');
-              soundController.playClick();
-            }}
-          >
-            <div className="icon-wrap" style={{ background: 'rgba(16, 185, 129, 0.15)' }}>
-              <Building2 size={18} color="#10b981" />
+      {/* TAB 0: PRIMARY WALLET DASHBOARD */}
+      {activeTab === 'wallet' && (
+        <>
+          {/* Revolut / Strike Style Dark Glass Balance Card */}
+          <div className="balance-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+                  Primary Treasury
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHideBalance(!hideBalance)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+                  title={hideBalance ? 'Show Balance' : 'Hide Balance'}
+                >
+                  {hideBalance ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              <div style={{ fontSize: '11px', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', padding: '3px 8px', borderRadius: 'var(--radius-full)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span className="status-dot" style={{ width: '5px', height: '5px', background: '#10b981' }}></span>
+                1 BTC = ₦{(BTC_TO_NGN_RATE / 1000000).toFixed(1)}M
+              </div>
             </div>
-            <span>Cash Out to Bank</span>
-            <span style={{ fontSize: '10px', color: '#10b981' }}>OPay / PalmPay / M-Pesa</span>
-          </div>
 
-          <div
-            className={`quick-action-card ${activeTab === 'pos' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('pos');
-              soundController.playClick();
-            }}
-          >
-            <div className="icon-wrap" style={{ background: 'rgba(247, 147, 26, 0.15)' }}>
-              <Store size={18} color="var(--btc-orange)" />
+            <div style={{ width: '100%', marginTop: '8px' }}>
+              <div className="balance-fiat mono-num" style={{ fontSize: '34px', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', margin: 0 }}>
+                {hideBalance ? '••••••••' : `₦${totalNgn.toLocaleString()}`}
+                <span style={{ fontSize: '16px', color: 'var(--text-muted)', marginLeft: '6px', fontWeight: 500 }}>NGN</span>
+              </div>
+              <div className="balance-sats mono-num" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--btc-orange)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {hideBalance ? '••••••' : totalSats.toLocaleString()} sats
+                <span style={{ fontSize: '10px', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', padding: '1px 6px', borderRadius: '4px' }}>
+                  Sound Money
+                </span>
+              </div>
             </div>
-            <span>Merchant POS</span>
-            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Offline QR & NFC</span>
-          </div>
 
-          <div
-            className={`quick-action-card ${activeTab === 'bitchat' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('bitchat');
-              soundController.playClick();
-            }}
-          >
-            <div className="icon-wrap" style={{ background: 'rgba(168, 85, 247, 0.15)' }}>
-              <MessageSquare size={18} color="#c084fc" />
+            {/* 4 Flagship Circular Action Buttons */}
+            <div className="action-buttons-row">
+              <button
+                type="button"
+                className="action-btn-item"
+                onClick={() => {
+                  setActiveTab('pos');
+                  soundController.playClick();
+                }}
+              >
+                <div className="action-btn-circle pos">
+                  <Store size={22} />
+                </div>
+                <span className="action-btn-label">Collect (POS)</span>
+              </button>
+
+              <button
+                type="button"
+                className="action-btn-item"
+                onClick={() => {
+                  setShowWithdrawModal(true);
+                  soundController.playClick();
+                }}
+              >
+                <div className="action-btn-circle cashout">
+                  <Building2 size={22} />
+                </div>
+                <span className="action-btn-label">Cash Out</span>
+              </button>
+
+              <button
+                type="button"
+                className="action-btn-item"
+                onClick={() => {
+                  setActiveTab('bitchat');
+                  soundController.playClick();
+                }}
+              >
+                <div className="action-btn-circle">
+                  <MessageSquare size={22} color="#c084fc" />
+                </div>
+                <span className="action-btn-label">BitChat</span>
+              </button>
+
+              <button
+                type="button"
+                className="action-btn-item"
+                onClick={() => {
+                  setActiveTab('vault');
+                  soundController.playClick();
+                }}
+              >
+                <div className="action-btn-circle">
+                  <ShieldCheck size={22} color="#60a5fa" />
+                </div>
+                <span className="action-btn-label">Vault</span>
+              </button>
             </div>
-            <span>BitChat P2P</span>
-            <span style={{ fontSize: '10px', color: '#c084fc' }}>Encrypted Nostr Sats</span>
           </div>
 
-          <div
-            className={`quick-action-card ${activeTab === 'adashi' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('adashi');
-              soundController.playClick();
-            }}
-          >
-            <div className="icon-wrap" style={{ background: 'rgba(56, 189, 248, 0.15)' }}>
-              <Users size={18} color="#38bdf8" />
+          {/* Dual Vault & Lightning Account Cards */}
+          <div className="account-cards-grid">
+            <div
+              className="account-card"
+              style={{ border: '1px solid rgba(139, 92, 246, 0.3)', background: 'linear-gradient(145deg, rgba(139, 92, 246, 0.08) 0%, rgba(18, 24, 38, 0.8) 100%)' }}
+              onClick={() => setActiveTab('vault')}
+            >
+              <div className="account-card-header">
+                <div className="account-card-title" style={{ color: '#c4b5fd' }}>
+                  <ShieldCheck size={16} />
+                  Offline Ecash Vault
+                </div>
+                <span style={{ fontSize: '10px', background: 'rgba(139, 92, 246, 0.2)', color: '#ddd6fe', padding: '2px 6px', borderRadius: '6px', fontWeight: 600 }}>
+                  Zero-Data
+                </span>
+              </div>
+              <div>
+                <div className="account-card-balance" style={{ color: '#ede9fe' }}>
+                  {vaultSats.toLocaleString()} <span style={{ fontSize: '13px', color: 'var(--btc-orange)' }}>sats</span>
+                </div>
+                <div className="account-card-fiat">≈ ₦{satsToNgn(vaultSats).toLocaleString()} NGN ({proofs.length} notes)</div>
+              </div>
             </div>
-            <span>Adashi Circles</span>
-            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Community Pot</span>
+
+            <div
+              className="account-card"
+              style={{ border: '1px solid rgba(247, 147, 26, 0.3)', background: 'linear-gradient(145deg, rgba(247, 147, 26, 0.08) 0%, rgba(18, 24, 38, 0.8) 100%)' }}
+              onClick={() => setShowLnAddressModal(true)}
+            >
+              <div className="account-card-header">
+                <div className="account-card-title" style={{ color: 'var(--btc-orange)' }}>
+                  <Zap size={16} />
+                  Lightning Channel
+                </div>
+                <span style={{ fontSize: '10px', background: 'rgba(247, 147, 26, 0.2)', color: '#fde68a', padding: '2px 6px', borderRadius: '6px', fontWeight: 600 }}>
+                  Instant
+                </span>
+              </div>
+              <div>
+                <div className="account-card-balance" style={{ color: '#fff' }}>
+                  {lightningSats.toLocaleString()} <span style={{ fontSize: '13px', color: 'var(--btc-orange)' }}>sats</span>
+                </div>
+                <div className="account-card-fiat">≈ ₦{satsToNgn(lightningSats).toLocaleString()} NGN (Blink L2)</div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Navigation Tabs */}
-      <nav className="tabs-nav">
-        <button
-          className={`tab-btn ${activeTab === 'pos' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('pos');
-            soundController.playClick();
-          }}
-        >
-          <Store size={18} />
-          {t.posTab}
-        </button>
+          {/* Recent Activity Card */}
+          <div className="card" style={{ marginTop: '2px' }}>
+            <div className="card-title-row" style={{ marginBottom: '12px' }}>
+              <div>
+                <h2 style={{ fontSize: '16px', fontWeight: 700 }}>Recent Activity</h2>
+                <p style={{ fontSize: '12px' }}>Verified payments and bank cashouts</p>
+              </div>
+              <button
+                className="btn-secondary"
+                style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                onClick={() => exportTransactionsToCsv(transactions)}
+              >
+                <Download size={13} />
+                Export CSV
+              </button>
+            </div>
 
-        <button
-          className={`tab-btn ${activeTab === 'bitchat' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('bitchat');
-            soundController.playClick();
-          }}
-        >
-          <MessageSquare size={18} />
-          {t.chatTab || 'BitChat'}
-        </button>
+            <div className="tx-list">
+              {transactions.slice(0, 5).map(tx => (
+                <div
+                  key={tx.id}
+                  className="tx-item"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setReceiptTx(tx)}
+                  title="Click to view printable receipt"
+                >
+                  <div className="tx-left">
+                    <div className={`tx-icon-circle ${tx.type}`}>
+                      {tx.type === 'incoming' ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
+                    </div>
+                    <div>
+                      <div className="tx-title" style={{ fontSize: '13px', fontWeight: 600 }}>{tx.memo}</div>
+                      <div className="tx-time" style={{ fontSize: '11px' }}>
+                        {new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} •{' '}
+                        {tx.offline ? (
+                          <span style={{ color: '#C4B5FD', fontWeight: 600 }}>Offline Ecash</span>
+                        ) : (
+                          <span style={{ color: 'var(--btc-orange)', fontWeight: 600 }}>Lightning L2</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-        <button
-          className={`tab-btn ${activeTab === 'bank' ? 'active' : ''}`}
-          style={{ borderColor: activeTab === 'bank' ? '#10b981' : undefined, color: activeTab === 'bank' ? '#10b981' : undefined }}
-          onClick={() => {
-            setActiveTab('bank');
-            soundController.playClick();
-          }}
-        >
-          <Building2 size={18} color="#10b981" />
-          Bank Cash Out (OPay)
-        </button>
-
-        <button
-          className={`tab-btn ${activeTab === 'adashi' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('adashi');
-            soundController.playClick();
-          }}
-        >
-          <Users size={18} />
-          {t.adashiTab} ({circles.length})
-        </button>
-
-        <button
-          className={`tab-btn ${activeTab === 'vault' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('vault');
-            soundController.playClick();
-          }}
-        >
-          <ShieldCheck size={18} />
-          {t.vaultTab} ({proofs.length} notes)
-        </button>
-
-        <button
-          className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('history');
-            soundController.playClick();
-          }}
-        >
-          <Clock size={18} />
-          {t.historyTab} ({transactions.length})
-        </button>
-
-        <button
-          className={`tab-btn ${activeTab === 'lab' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('lab');
-            soundController.playClick();
-          }}
-        >
-          <Sliders size={18} />
-          Stress Lab & Outages
-        </button>
-      </nav>
+                  <div className="tx-right">
+                    <div className={`tx-sats mono-num ${tx.type === 'incoming' ? 'pos' : 'neg'}`} style={{ fontSize: '14px' }}>
+                      {tx.type === 'incoming' ? '+' : '-'}{tx.amountSats.toLocaleString()} sats
+                    </div>
+                    <div className="tx-ngn mono-num" style={{ fontSize: '11px' }}>
+                      ≈ ₦{tx.amountNgn.toLocaleString()} NGN
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* TAB 1: MERCHANT POS */}
       {activeTab === 'pos' && (
@@ -1840,95 +1771,6 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 4: TRANSACTION HISTORY */}
-      {activeTab === 'history' && (
-        <div className="card">
-          <div className="card-title-row">
-            <div>
-              <h2>{t.historyTab}</h2>
-              <p>Audit log of local offline Cashu transfers and Lightning settlements.</p>
-            </div>
-            <button
-              className="btn-secondary"
-              style={{ width: 'auto', padding: '8px 14px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
-              onClick={() => exportTransactionsToCsv(transactions)}
-            >
-              <Download size={14} />
-              {t.exportCsv}
-            </button>
-          </div>
-
-          <div className="tx-list">
-            {transactions.map(tx => (
-              <div
-                key={tx.id}
-                className="tx-item"
-                style={{ cursor: 'pointer' }}
-                onClick={() => setReceiptTx(tx)}
-                title="Click to view printable receipt"
-              >
-                <div className="tx-left">
-                  <div className={`tx-icon-circle ${tx.type}`}>
-                    {tx.type === 'incoming' ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
-                  </div>
-                  <div>
-                    <div className="tx-title">{tx.memo}</div>
-                    <div className="tx-time">
-                      {new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} •{' '}
-                      {tx.offline ? (
-                        <span style={{ color: '#C4B5FD', fontWeight: 600 }}>{t.offlineBadge}</span>
-                      ) : (
-                        <span style={{ color: 'var(--btc-orange)', fontWeight: 600 }}>{t.lightningBadge}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="tx-right">
-                  <div className={`tx-sats mono-num ${tx.type === 'incoming' ? 'pos' : 'neg'}`}>
-                    {tx.type === 'incoming' ? '+' : '-'}{tx.amountSats.toLocaleString()} sats
-                  </div>
-                  <div className="tx-ngn mono-num">
-                    ≈ ₦{tx.amountNgn.toLocaleString()} NGN
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 5: BANK CASH OUT (AFRICAN FIAT GATEWAY) */}
-      {activeTab === 'bank' && (
-        <WithdrawToBankModal
-          isInline={true}
-          vaultProofs={proofs}
-          onVaultProofsChanged={updated => {
-            setProofs(updated);
-            saveStoredProofs(updated);
-            saveSecureProofs(updated).catch(console.warn);
-          }}
-          onTransactionRecorded={tx => {
-            setTransactions(prev => [tx, ...prev]);
-            saveSecureTransactions([tx, ...transactions]).catch(console.warn);
-          }}
-          lang={lang}
-        />
-      )}
-
-      {/* TAB 6: JUDGE STRESS LAB & OFFLINE OUTAGES */}
-      {activeTab === 'lab' && (
-        <MarketSimulationLab
-          isInline={true}
-          onNetworkChange={(offline: boolean) => setIsOffline(offline)}
-          isCurrentlyOffline={isOffline}
-          activeProofs={proofs}
-          onTriggerAdashiStep={() => {
-            handleContributeAdashi('circle-1');
-          }}
-        />
-      )}
-
       {/* MODAL: QR SCANNER (CAMERA & FILE) */}
       <QrScannerModal
         isOpen={showQrScanner}
@@ -2012,23 +1854,6 @@ export const App: React.FC = () => {
         onMintSelected={url => setActiveMintUrl(url)}
       />
 
-      {/* MODAL: INTERACTIVE FULL-SCREEN PITCH DECK & ARCHITECTURE */}
-      <InteractivePitchDeck
-        isOpen={showPitchModal}
-        onClose={() => setShowPitchModal(false)}
-      />
-
-      {/* MODAL: MARKET STRESS LAB & SIMULATION */}
-      <MarketSimulationLab
-        isOpen={showSimulationLab}
-        onClose={() => setShowSimulationLab(false)}
-        onNetworkChange={(offline: boolean) => setIsOffline(offline)}
-        isCurrentlyOffline={isOffline}
-        activeProofs={proofs}
-        onTriggerAdashiStep={() => {
-          handleContributeAdashi('circle-1');
-        }}
-      />
 
       {/* MODAL: FEATURE-PHONE / SMS BEAM */}
       <SmsBeamModal
@@ -2052,6 +1877,79 @@ export const App: React.FC = () => {
         }}
         lang={lang}
       />
+
+      {/* Fixed Native Mobile Navigation Dock */}
+      <nav className="mobile-bottom-nav">
+        <button
+          type="button"
+          className={`nav-item ${activeTab === 'wallet' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('wallet');
+            soundController.playClick();
+          }}
+        >
+          <div className="nav-icon-wrap">
+            <Home size={20} />
+          </div>
+          <span>Wallet</span>
+        </button>
+
+        <button
+          type="button"
+          className={`nav-item ${activeTab === 'pos' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('pos');
+            soundController.playClick();
+          }}
+        >
+          <div className="nav-icon-wrap">
+            <Store size={20} />
+          </div>
+          <span>POS</span>
+        </button>
+
+        <button
+          type="button"
+          className={`nav-item ${activeTab === 'bitchat' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('bitchat');
+            soundController.playClick();
+          }}
+        >
+          <div className="nav-icon-wrap">
+            <MessageSquare size={20} />
+          </div>
+          <span>BitChat</span>
+        </button>
+
+        <button
+          type="button"
+          className={`nav-item ${activeTab === 'adashi' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('adashi');
+            soundController.playClick();
+          }}
+        >
+          <div className="nav-icon-wrap">
+            <Users size={20} />
+          </div>
+          <span>Adashi</span>
+        </button>
+
+        <button
+          type="button"
+          className={`nav-item ${activeTab === 'vault' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('vault');
+            soundController.playClick();
+          }}
+        >
+          <div className="nav-icon-wrap">
+            <ShieldCheck size={20} />
+          </div>
+          <span>Vault</span>
+        </button>
+      </nav>
     </div>
   );
 };

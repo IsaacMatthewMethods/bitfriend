@@ -1,11 +1,12 @@
-/* Main Application Layout */
+/* Main Application Layout - Premium Mobile Frame */
 .app-container {
-  max-width: 1040px;
+  max-width: 540px;
   margin: 0 auto;
-  padding: 16px 16px 80px 16px;
+  padding: 12px 14px 100px 14px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+  min-height: 100vh;
 }
 
 /* Header & Navbar */
@@ -871,70 +872,190 @@
   animation: pulse 2s infinite;
 }
 
-/* Quick Action Grid inside Hero Card */
-.quick-action-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+/* ==========================================================================
+   Mobile Blockchain Wallet Action Bar & Account Cards
+   ========================================================================== */
+.action-buttons-row {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 24px;
   gap: 12px;
-  margin-top: 18px;
   width: 100%;
 }
 
-@media (max-width: 768px) {
-  .quick-action-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-.quick-action-card {
+.action-btn-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 14px 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
+  gap: 8px;
   cursor: pointer;
-  transition: all var(--transition-normal);
-  text-align: center;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  transition: transform 0.15s ease;
+  flex: 1;
+}
+
+.action-btn-item:hover {
+  transform: translateY(-2px);
+}
+
+.action-btn-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.action-btn-item:hover .action-btn-circle {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.action-btn-circle.cashout {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: none;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+}
+
+.action-btn-circle.pos {
+  background: linear-gradient(135deg, #f7931a 0%, #d97706 100%);
+  border: none;
+  box-shadow: 0 4px 16px rgba(247, 147, 26, 0.35);
+}
+
+.action-btn-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Dual Portfolio Account Breakdown Cards */
+.account-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+@media (max-width: 600px) {
+  .account-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.account-card {
+  background: rgba(18, 24, 38, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.account-card:hover {
+  background: rgba(25, 33, 52, 0.85);
+  border-color: var(--border-focus);
+  transform: translateY(-2px);
+}
+
+.account-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.account-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
   font-weight: 600;
 }
 
-.quick-action-card:hover {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: var(--border-focus);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+.account-card-balance {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  font-family: var(--font-mono);
 }
 
-.quick-action-card.active {
-  background: linear-gradient(135deg, rgba(247, 147, 26, 0.2), rgba(247, 147, 26, 0.05));
-  border-color: var(--btc-orange);
-  color: var(--btc-orange);
+.account-card-fiat {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
-.quick-action-card.bank-action {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.03));
-  border-color: rgba(16, 185, 129, 0.3);
+/* ==========================================================================
+   Mobile Fixed Bottom Navigation Dock
+   ========================================================================== */
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: 580px;
+  margin: 0 auto;
+  background: rgba(10, 14, 23, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 12px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  z-index: 999;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.6);
 }
 
-.quick-action-card.bank-action:hover {
-  border-color: #10b981;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 12px;
 }
 
-.quick-action-card .icon-wrap {
-  width: 36px;
-  height: 36px;
+.nav-item:hover {
+  color: #94a3b8;
+}
+
+.nav-item.active {
+  color: #f7931a;
+}
+
+.nav-item.active .nav-icon-wrap {
+  background: rgba(247, 147, 26, 0.15);
+  color: #f7931a;
   border-radius: 10px;
+}
+
+.nav-icon-wrap {
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 2px;
+  transition: all 0.2s ease;
 }
 
 /* Merchant POS Inventory Catalogue Grid */
@@ -1010,37 +1131,6 @@
   0% { top: 4%; opacity: 0.9; }
   50% { top: 92%; opacity: 1; }
   100% { top: 4%; opacity: 0.9; }
-}
-
-/* Feature Spotlight Bar */
-.hackathon-judge-banner {
-  background: linear-gradient(90deg, rgba(247, 147, 26, 0.12) 0%, rgba(139, 92, 246, 0.12) 50%, rgba(16, 185, 129, 0.12) 100%);
-  border: 1px solid rgba(247, 147, 26, 0.35);
-  border-radius: var(--radius-md);
-  padding: 12px 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  font-size: 12px;
-}
-
-.hackathon-judge-banner .banner-text {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.hackathon-judge-banner .badge {
-  background: var(--btc-orange);
-  color: #000;
-  font-weight: 800;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
 }
 
 

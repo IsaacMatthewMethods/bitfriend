@@ -5,7 +5,7 @@ export const translations = {
     appTitle: 'BitFriend',
     appSubtitle: 'Offline Bitcoin & Ecash for African Grassroots Commerce',
     slogan: 'Pay, Save & Trade — Even Without Internet',
-    tagline: 'Global Bitcoin & Web3 Hackathon Edition',
+    tagline: 'Sovereign Offline Bitcoin & Ecash Super-App',
     online: 'Online (Lightning & Mint Connected)',
     offline: 'Offline Mode (Local P2P Ecash Active)',
     toggleNetwork: 'Simulate Network Outage',
@@ -14,7 +14,7 @@ export const translations = {
     vaultTab: 'Offline Vault',
     adashiTab: 'Adashi Savings',
     historyTab: 'History',
-    pitchTab: 'Judge Pitch Deck',
+    pitchTab: 'Architecture & Protocol',
     
     // POS Tab
     posHeader: 'Quick Market Terminal',
@@ -90,7 +90,7 @@ export const translations = {
     appTitle: 'BitFriend (BitAboki)',
     appSubtitle: 'Tsarin Bitcoin da Kuɗin Intanet (Ecash) don Kasuwancin Ƙasa',
     slogan: 'Biya, Tara Kuɗi, Yi Ciniki — Ko Ba Intanet',
-    tagline: 'Gasa ta Musamman ta Bitcoin da Web3',
+    tagline: 'Manhajar Bitcoin da Ecash na Zamani',
     online: 'A Haɗe (Lightning da Mint na Aiki)',
     offline: 'Babu Intanet (Kuɗin Ecash na Waya)',
     toggleNetwork: 'Gwada Yanke Intanet',
@@ -99,7 +99,7 @@ export const translations = {
     vaultTab: 'Rumbun Ecash',
     adashiTab: 'Adashi na Al\'umma',
     historyTab: 'Tarihin Biyan Kuɗi',
-    pitchTab: 'Bayanin Gasar (Pitch)',
+    pitchTab: 'Tsarin Fasaha',
     
     // POS Tab
     posHeader: 'Na\'urar Karɓar Kuɗi a Kasuwa',
