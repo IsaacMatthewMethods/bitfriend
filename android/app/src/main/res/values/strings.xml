@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BitFriend</string>
+    <string name="title_activity_main">BitFriend</string>
+    <string name="package_name">me.bitfriend.app</string>
+    <string name="custom_url_scheme">me.bitfriend.app</string>
+</resources>

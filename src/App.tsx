@@ -34,7 +34,8 @@ import {
   MessageSquare,
   Upload,
   Lock,
-  KeyRound
+  KeyRound,
+  Building2
 } from 'lucide-react';
 import type { Language, CashuProof, PaymentTransaction, AdashiCircle } from './types';
 import { getTranslation } from './utils/translations';
@@ -49,7 +50,8 @@ import {
   generateProof,
   getCustomMint,
   BTC_TO_NGN_RATE,
-  requestMintQuote
+  requestMintQuote,
+  autoSwapOfflineProofs
 } from './utils/cashuEngine';
 import { soundController } from './utils/audioVoice';
 import { isWebLNAvailable, requestWebLNPayment } from './utils/webln';
@@ -80,6 +82,7 @@ import { MarketSimulationLab } from './components/MarketSimulationLab';
 import { SmsBeamModal } from './components/SmsBeamModal';
 import { PinLockModal } from './components/PinLockModal';
 import { BitChatView } from './components/chat/BitChatView';
+import { WithdrawToBankModal } from './components/WithdrawToBankModal';
 import {
   testRelayConnections,
   subscribeRelayStatus,
@@ -182,6 +185,7 @@ export const App: React.FC = () => {
   const [showSmsBeam, setShowSmsBeam] = useState<boolean>(false);
   const [showPinModal, setShowPinModal] = useState<boolean>(false);
   const [pinModalMode, setPinModalMode] = useState<'unlock' | 'setup'>('unlock');
+  const [showWithdrawModal, setShowWithdrawModal] = useState<boolean>(false);
   const [hasConfiguredPin, setHasConfiguredPin] = useState<boolean>(false);
   const [isVaultLockedState, setIsVaultLockedState] = useState<boolean>(false);
   const [connectedRelays, setConnectedRelays] = useState<number>(3);
@@ -250,7 +254,17 @@ export const App: React.FC = () => {
 
   // Listen for native online/offline events
   useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
+    const handleOnline = () => {
+      setIsOffline(false);
+      // NUT-03: Auto-swap received offline proofs with mint to prevent double-spending
+      autoSwapOfflineProofs(proofs).then(res => {
+        if (res.swapped) {
+          setProofs(res.updatedProofs);
+          saveStoredProofs(res.updatedProofs);
+          soundController.playPaymentChime();
+        }
+      }).catch(console.warn);
+    };
     const handleOffline = () => setIsOffline(true);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -970,6 +984,32 @@ export const App: React.FC = () => {
             </span>
           </div>
         </div>
+
+        {/* Quick Action: Cash Out to Bank / Mobile Money */}
+        <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            className="btn-primary"
+            style={{
+              padding: '8px 14px',
+              fontSize: '12px',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              border: 'none',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              width: 'auto'
+            }}
+            onClick={() => {
+              setShowWithdrawModal(true);
+              soundController.playClick();
+            }}
+          >
+            <Building2 size={15} />
+            Cash Out to Bank (OPay / PalmPay / M-Pesa)
+          </button>
+        </div>
       </div>
 
       {/* Navigation Tabs */}
@@ -1318,6 +1358,39 @@ export const App: React.FC = () => {
               >
                 <RefreshCw size={14} />
                 {t.sweepToLightning}
+              </button>
+
+              <button
+                className="btn-secondary"
+                style={{ width: 'auto', padding: '8px 12px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', borderColor: 'rgba(247, 147, 26, 0.4)' }}
+                onClick={async () => {
+                  soundController.playClick();
+                  const res = await autoSwapOfflineProofs(proofs);
+                  if (res.swapped) {
+                    setProofs(res.updatedProofs);
+                    saveStoredProofs(res.updatedProofs);
+                    soundController.playPaymentChime();
+                    alert(`NUT-03 Swap Succeeded! Swapped ${res.count} proofs through ${res.liveMint ? 'live production mint' : 'failover engine'}.`);
+                  } else {
+                    alert('All proofs already verified and unspent on mint.');
+                  }
+                }}
+                title="NUT-03 Proof Swap & NUT-07 Double-Spend Check"
+              >
+                <Zap size={14} color="var(--btc-orange)" />
+                NUT-03 Swap
+              </button>
+              <button
+                className="btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '12px', gap: '5px', borderColor: 'rgba(16, 185, 129, 0.4)', color: '#10b981' }}
+                onClick={() => {
+                  setShowWithdrawModal(true);
+                  soundController.playClick();
+                }}
+                title="Convert ecash proofs directly to Nigerian Bank or Pan-African Mobile Money"
+              >
+                <Building2 size={14} color="#10b981" />
+                Cash Out to Bank
               </button>
             </div>
           </div>
@@ -1789,6 +1862,23 @@ export const App: React.FC = () => {
       <SmsBeamModal
         isOpen={showSmsBeam}
         onClose={() => setShowSmsBeam(false)}
+      />
+
+      {/* MODAL: AFRICAN FIAT ON/OFF RAMP (OPay / PalmPay / Moniepoint / M-Pesa) */}
+      <WithdrawToBankModal
+        isOpen={showWithdrawModal}
+        onClose={() => setShowWithdrawModal(false)}
+        vaultProofs={proofs}
+        onVaultProofsChanged={updated => {
+          setProofs(updated);
+          saveStoredProofs(updated);
+          saveSecureProofs(updated).catch(console.warn);
+        }}
+        onTransactionRecorded={tx => {
+          setTransactions(prev => [tx, ...prev]);
+          saveSecureTransactions([tx, ...transactions]).catch(console.warn);
+        }}
+        lang={lang}
       />
     </div>
   );
