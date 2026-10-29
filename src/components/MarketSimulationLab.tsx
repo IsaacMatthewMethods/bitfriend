@@ -6,9 +6,6 @@ import {
   Wifi,
   WifiOff,
   Play,
-  RotateCcw,
-  CheckCircle,
-  ShieldAlert,
   Cpu,
   Layers
 } from 'lucide-react';
@@ -310,7 +307,7 @@ export const MarketSimulationLab: React.FC<MarketSimulationLabProps> = ({
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'white' }}>
-                Accelerated 5-Round Adashi Simulation
+                Accelerated 5-Round Adashi Simulation {isAutoSimulating && <span style={{ color: 'var(--btc-orange)', fontSize: '12px' }}>(Round {simRound}/5)</span>}
               </h4>
               <button
                 className="btn-primary"

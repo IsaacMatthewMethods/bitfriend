@@ -20,9 +20,9 @@ export const CreateAdashiModal: React.FC<CreateAdashiModalProps> = ({
   const [contributionSats, setContributionSats] = useState<string>('1500');
 
   const [members, setMembers] = useState<Array<{ name: string; location: string }>>([
-    { name: 'You (Organizer)', location: 'Kaduna Central' },
-    { name: 'Amina Lawal', location: 'Kawo' },
-    { name: 'Ibrahim Danjuma', location: 'Tudun Wada' },
+    { name: 'You (Organizer)', location: 'Central Hub' },
+    { name: 'Amina Lawal', location: 'North Market' },
+    { name: 'Ibrahim Danjuma', location: 'West Terminal' },
   ]);
 
   const [newMemberName, setNewMemberName] = useState<string>('');
@@ -36,7 +36,7 @@ export const CreateAdashiModal: React.FC<CreateAdashiModalProps> = ({
       ...prev,
       {
         name: newMemberName.trim(),
-        location: newMemberLocation.trim() || 'Kaduna',
+        location: newMemberLocation.trim() || 'Market Hub',
       },
     ]);
     setNewMemberName('');

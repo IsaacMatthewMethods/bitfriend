@@ -81,7 +81,7 @@ Verified by BitFriend Cashu Protocol
           <div style={{ textAlign: 'center', borderBottom: '1px dashed #CBD5E1', paddingBottom: '12px', marginBottom: '12px' }}>
             <div style={{ fontSize: '20px', fontWeight: 900, letterSpacing: '-0.5px' }}>BITFRIEND</div>
             <div style={{ fontSize: '11px', color: '#64748B' }}>Grassroots Bitcoin Commerce</div>
-            <div style={{ fontSize: '11px', color: '#64748B' }}>Kaduna Market Terminal</div>
+            <div style={{ fontSize: '11px', color: '#64748B' }}>Merchant Market Terminal</div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px', marginBottom: '14px' }}>

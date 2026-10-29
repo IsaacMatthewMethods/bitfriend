@@ -1,7 +1,7 @@
 // Real Elliptic Curve Cryptography on secp256k1 (Cashu BDHKE / NUT-00)
-import { secp256k1 } from '@noble/curves/secp256k1';
-import { sha256 } from '@noble/hashes/sha256';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import type { CashuProof } from '../types';
 
 /**
@@ -53,7 +53,7 @@ export function hashToCurvePoint(secret: string): { pointHex: string; x: string;
  * Generate cryptographic proof with genuine secp256k1 private secret and public unblinded signature
  */
 export function generateRealCryptoProof(amount: number, mintPubkeyHex?: string): CashuProof {
-  const privKeyBytes = secp256k1.utils.randomPrivateKey();
+  const privKeyBytes = secp256k1.utils.randomSecretKey();
   const secretHex = bytesToHex(privKeyBytes);
   const secret = `bitfriend_sec_${secretHex.slice(0, 24)}`;
   
@@ -69,7 +69,7 @@ export function generateRealCryptoProof(amount: number, mintPubkeyHex?: string):
       const combined = mintPoint.add(secretPoint);
       signatureC = combined.toHex(true);
     } else {
-      const randomScalar = secp256k1.utils.randomPrivateKey();
+      const randomScalar = secp256k1.utils.randomSecretKey();
       const randomScalarBigInt = BigInt(`0x${bytesToHex(randomScalar)}`);
       const sigPoint = secp256k1.Point.fromHex(pointHex).multiply(randomScalarBigInt);
       signatureC = sigPoint.toHex(true);
@@ -99,7 +99,7 @@ export function verifyProofCurveSignature(proof: CashuProof): {
   };
 } {
   try {
-    const { pointHex, x, y } = hashToCurvePoint(proof.secret);
+    const { x, y } = hashToCurvePoint(proof.secret);
     
     // Verify C is a valid point on secp256k1
     let isValidPoint = false;

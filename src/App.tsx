@@ -29,7 +29,10 @@ import {
   Key,
   AtSign,
   Activity,
-  Smartphone
+  Smartphone,
+  Sliders,
+  MessageSquare,
+  Upload
 } from 'lucide-react';
 import type { Language, CashuProof, PaymentTransaction, AdashiCircle } from './types';
 import { getTranslation } from './utils/translations';
@@ -49,6 +52,7 @@ import {
 import { soundController } from './utils/audioVoice';
 import { isWebLNAvailable, requestWebLNPayment } from './utils/webln';
 import { isVaultBackedUp } from './utils/bip39Vault';
+import { exportVaultBackupFile, parseVaultBackupFile } from './utils/vaultBackup';
 import { QrScannerModal } from './components/QrScannerModal';
 import { CreateAdashiModal } from './components/CreateAdashiModal';
 import { ReceiptModal, exportTransactionsToCsv } from './components/ReceiptModal';
@@ -58,13 +62,15 @@ import { VaultBackupModal } from './components/VaultBackupModal';
 import { LightningAddressModal } from './components/LightningAddressModal';
 import { MultiMintMonitor } from './components/MultiMintMonitor';
 import { InteractivePitchDeck } from './components/InteractivePitchDeck';
+import { MarketSimulationLab } from './components/MarketSimulationLab';
+import { SmsBeamModal } from './components/SmsBeamModal';
 import './App.css';
 
-// Initial Adashi Circles for Kaduna Grassroots Merchants
+// Initial Adashi Circles for Grassroots Merchants
 const INITIAL_CIRCLES: AdashiCircle[] = [
   {
     id: 'circle-1',
-    name: 'Kasuwan Barci Fabric Traders Pot',
+    name: 'Central Market Fabric Traders Pot',
     category: 'Market Traders Cooperative',
     frequency: 'weekly',
     contributionSats: 2500,
@@ -72,16 +78,16 @@ const INITIAL_CIRCLES: AdashiCircle[] = [
     totalRounds: 5,
     nextPayoutDate: 'Next Monday, 9:00 AM',
     members: [
-      { id: 'm1', name: 'Fatima Sani', location: 'Kaduna North', avatar: 'FS', hasContributed: true, turnOrder: 1, isCurrentRecipient: false },
-      { id: 'm2', name: 'Ibrahim Bello', location: 'Tudun Wada', avatar: 'IB', hasContributed: true, turnOrder: 2, isCurrentRecipient: false },
-      { id: 'm3', name: 'Amina Garba (You)', location: 'Kawo', avatar: 'AG', hasContributed: true, turnOrder: 3, isCurrentRecipient: true },
-      { id: 'm4', name: 'Yusuf Danjuma', location: 'Barnawa', avatar: 'YD', hasContributed: false, turnOrder: 4, isCurrentRecipient: false },
-      { id: 'm5', name: 'Usman Aliyu', location: 'Sabon Gari', avatar: 'UA', hasContributed: false, turnOrder: 5, isCurrentRecipient: false },
+      { id: 'm1', name: 'Fatima Sani', location: 'North Market', avatar: 'FS', hasContributed: true, turnOrder: 1, isCurrentRecipient: false },
+      { id: 'm2', name: 'Ibrahim Bello', location: 'West Terminal', avatar: 'IB', hasContributed: true, turnOrder: 2, isCurrentRecipient: false },
+      { id: 'm3', name: 'Amina Garba (You)', location: 'Central Hub', avatar: 'AG', hasContributed: true, turnOrder: 3, isCurrentRecipient: true },
+      { id: 'm4', name: 'Yusuf Danjuma', location: 'South District', avatar: 'YD', hasContributed: false, turnOrder: 4, isCurrentRecipient: false },
+      { id: 'm5', name: 'Usman Aliyu', location: 'Old City Market', avatar: 'UA', hasContributed: false, turnOrder: 5, isCurrentRecipient: false },
     ],
   },
   {
     id: 'circle-2',
-    name: 'Doka Keke-NAPEP Riders Daily Pool',
+    name: 'Metro Tricycle Riders Daily Pool',
     category: 'Transport Union',
     frequency: 'daily',
     contributionSats: 1000,
@@ -89,10 +95,10 @@ const INITIAL_CIRCLES: AdashiCircle[] = [
     totalRounds: 4,
     nextPayoutDate: 'Tomorrow, 6:00 PM',
     members: [
-      { id: 'k1', name: 'Musa Abdullahi', location: 'Doka', avatar: 'MA', hasContributed: true, turnOrder: 1, isCurrentRecipient: false },
-      { id: 'k2', name: 'Shehu Garba', location: 'Unguwan Rimi', avatar: 'SG', hasContributed: false, turnOrder: 2, isCurrentRecipient: true },
-      { id: 'k3', name: 'Aliyu Umar', location: 'Kakuri', avatar: 'AU', hasContributed: true, turnOrder: 3, isCurrentRecipient: false },
-      { id: 'k4', name: 'Balarabe Dikko', location: 'Rigasa', avatar: 'BD', hasContributed: false, turnOrder: 4, isCurrentRecipient: false },
+      { id: 'k1', name: 'Musa Abdullahi', location: 'Station Hub', avatar: 'MA', hasContributed: true, turnOrder: 1, isCurrentRecipient: false },
+      { id: 'k2', name: 'Shehu Garba', location: 'East District', avatar: 'SG', hasContributed: false, turnOrder: 2, isCurrentRecipient: true },
+      { id: 'k3', name: 'Aliyu Umar', location: 'Industrial Zone', avatar: 'AU', hasContributed: true, turnOrder: 3, isCurrentRecipient: false },
+      { id: 'k4', name: 'Balarabe Dikko', location: 'Transit Park', avatar: 'BD', hasContributed: false, turnOrder: 4, isCurrentRecipient: false },
     ],
   },
 ];
@@ -150,11 +156,14 @@ export const App: React.FC = () => {
   const [showBackupModal, setShowBackupModal] = useState<boolean>(false);
   const [showLnAddressModal, setShowLnAddressModal] = useState<boolean>(false);
   const [showMultiMintModal, setShowMultiMintModal] = useState<boolean>(false);
+  const [showSimulationLab, setShowSimulationLab] = useState<boolean>(false);
+  const [showSmsBeam, setShowSmsBeam] = useState<boolean>(false);
   
   const [activeMintUrl, setActiveMintUrl] = useState<string>(getCustomMint());
   const [vaultBackedUp, setVaultBackedUp] = useState<boolean>(() => isVaultBackedUp());
   const [hasWebLN, setHasWebLN] = useState<boolean>(false);
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
+  const vaultFileRef = React.useRef<HTMLInputElement | null>(null);
 
   // Balances & Proofs
   const [proofs, setProofs] = useState<CashuProof[]>([]);
@@ -189,7 +198,7 @@ export const App: React.FC = () => {
 
   // POS State
   const [chargeNgn, setChargeNgn] = useState<string>('1500');
-  const [customerNote, setCustomerNote] = useState<string>('Kasuwan Barci Store Sale');
+  const [customerNote, setCustomerNote] = useState<string>('Central Market Store Sale');
   const [posSuccessData, setPosSuccessData] = useState<{ amountSats: number; amountNgn: number; txId: string } | null>(null);
 
   // Vault State
@@ -587,6 +596,32 @@ export const App: React.FC = () => {
     });
   };
 
+  // Restore vault from JSON backup file
+  const handleRestoreBackupFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = event => {
+      const content = event.target?.result as string;
+      const res = parseVaultBackupFile(content);
+      if (res.success && res.data) {
+        setProofs(res.data.proofs);
+        saveStoredProofs(res.data.proofs);
+        if (res.data.transactions.length > 0) setTransactions(res.data.transactions);
+        if (res.data.circles.length > 0) setCircles(res.data.circles);
+
+        soundController.playPaymentChime();
+        confetti({ particleCount: 70, spread: 70 });
+        alert(`Successfully restored ${res.data.proofs.length} token proofs from backup file!`);
+      } else {
+        alert(res.error || 'Failed to restore backup file.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   // Group proofs by denomination
   const denominationSummary: { [denom: number]: number } = {};
   proofs.forEach(p => {
@@ -601,7 +636,7 @@ export const App: React.FC = () => {
           <div className="brand-logo">₿</div>
           <div className="brand-info">
             <h1>{t.appTitle}</h1>
-            <span className="badge-pill">Btrust x GDG Kaduna DevFest</span>
+            <span className="badge-pill">Bitcoin & Web3 Hackathon 2026</span>
           </div>
         </div>
 
@@ -678,6 +713,18 @@ export const App: React.FC = () => {
             title="Global Mint Latency Monitor"
           >
             <Activity size={15} />
+          </button>
+
+          {/* Market Simulation Lab */}
+          <button
+            className="ctrl-btn"
+            onClick={() => {
+              setShowSimulationLab(true);
+              soundController.playClick();
+            }}
+            title="Market Simulation Lab & Stress Test"
+          >
+            <Sliders size={15} />
           </button>
 
           {/* Judge Pitch Deck Button */}
@@ -918,6 +965,15 @@ export const App: React.FC = () => {
                     <Radio size={16} />
                     {t.nfcTapBtn}
                   </button>
+
+                  <button
+                    className="btn-secondary"
+                    style={{ fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                    onClick={() => setShowSmsBeam(true)}
+                  >
+                    <MessageSquare size={16} />
+                    Feature Phone / SMS
+                  </button>
                 </div>
               </div>
             </div>
@@ -1017,6 +1073,32 @@ export const App: React.FC = () => {
                 <Key size={14} color={vaultBackedUp ? 'var(--color-success)' : 'var(--btc-orange)'} />
                 {vaultBackedUp ? 'BIP-39 Backed Up' : 'Backup Seed (12 Words)'}
               </button>
+
+              <button
+                className="btn-secondary"
+                style={{ width: 'auto', padding: '8px 12px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                onClick={() => exportVaultBackupFile(proofs, transactions, circles)}
+              >
+                <Download size={14} />
+                Export Vault (.json)
+              </button>
+
+              <button
+                className="btn-secondary"
+                style={{ width: 'auto', padding: '8px 12px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                onClick={() => vaultFileRef.current?.click()}
+              >
+                <Upload size={14} />
+                Restore File
+              </button>
+
+              <input
+                ref={vaultFileRef}
+                type="file"
+                accept=".json,application/json"
+                style={{ display: 'none' }}
+                onChange={handleRestoreBackupFile}
+              />
 
               <button
                 className="btn-secondary"
@@ -1415,6 +1497,24 @@ export const App: React.FC = () => {
       <InteractivePitchDeck
         isOpen={showPitchModal}
         onClose={() => setShowPitchModal(false)}
+      />
+
+      {/* MODAL: MARKET STRESS LAB & SIMULATION */}
+      <MarketSimulationLab
+        isOpen={showSimulationLab}
+        onClose={() => setShowSimulationLab(false)}
+        onNetworkChange={(offline: boolean) => setIsOffline(offline)}
+        isCurrentlyOffline={isOffline}
+        activeProofs={proofs}
+        onTriggerAdashiStep={() => {
+          handleContributeAdashi('circle-1');
+        }}
+      />
+
+      {/* MODAL: FEATURE-PHONE / SMS BEAM */}
+      <SmsBeamModal
+        isOpen={showSmsBeam}
+        onClose={() => setShowSmsBeam(false)}
       />
     </div>
   );

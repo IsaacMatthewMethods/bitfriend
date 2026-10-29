@@ -39,7 +39,7 @@ export const InteractivePitchDeck: React.FC<InteractivePitchDeckProps> = ({ isOp
   const slides: Slide[] = [
     {
       id: 1,
-      tag: 'BTRUST x GDG KADUNA DEVFEST 2026',
+      tag: 'GLOBAL BITCOIN & WEB3 HACKATHON 2026',
       title: 'BitFriend (BitAboki)',
       subtitle: 'Offline Bitcoin & Chaumian Ecash for African Grassroots Commerce',
       content: (
@@ -63,7 +63,7 @@ export const InteractivePitchDeck: React.FC<InteractivePitchDeckProps> = ({ isOp
           </div>
 
           <div style={{ fontSize: '18px', color: 'var(--text-secondary)', maxWidth: '560px', textAlign: 'center', lineHeight: 1.6 }}>
-            Enabling informal market vendors in Northern Nigeria to <strong style={{ color: 'white' }}>receive instant payments</strong> and <strong style={{ color: 'white' }}>pool collective savings</strong> with zero cellular data.
+            Enabling informal market vendors across emerging African economies to <strong style={{ color: 'white' }}>receive instant payments</strong> and <strong style={{ color: 'white' }}>pool collective savings</strong> with zero cellular data.
           </div>
 
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '10px' }}>
@@ -82,11 +82,11 @@ export const InteractivePitchDeck: React.FC<InteractivePitchDeckProps> = ({ isOp
           </div>
         </div>
       ),
-      speakerNotes: 'Start by welcoming the judges and stating our mission: bringing self-sovereign Bitcoin to where it matters most—the informal markets of Northern Nigeria.',
+      speakerNotes: 'Start by welcoming the judges and stating our mission: bringing self-sovereign Bitcoin to where it matters most—informal cash-dominated grassroots commerce.',
     },
     {
       id: 2,
-      tag: 'THE GROUND TRUTH IN KADUNA',
+      tag: 'THE GROUND TRUTH: REAL-WORLD MARKET CONDITIONS',
       title: 'The Dual Crisis in African Markets',
       subtitle: 'Why Millions of Daily Transactions are Broken',
       content: (
@@ -97,7 +97,7 @@ export const InteractivePitchDeck: React.FC<InteractivePitchDeckProps> = ({ isOp
               <h4 style={{ fontSize: '16px', fontWeight: 800 }}>1. Telecom & POS Collapse</h4>
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-              In crowded markets like <strong>Kasuwan Barci</strong>, cellular networks jam. Card POS terminals decline transactions, and bank transfer alerts take 20-45 minutes. Merchants lose sales or fall victim to fake SMS alert scams.
+              In crowded informal markets and transport hubs, cellular networks routinely fail. Card POS terminals decline transactions, and bank transfer alerts take 20-45 minutes. Merchants lose sales or fall victim to fake SMS alert scams.
             </p>
           </div>
 
@@ -302,15 +302,15 @@ export const InteractivePitchDeck: React.FC<InteractivePitchDeckProps> = ({ isOp
     },
     {
       id: 7,
-      tag: 'BTRUST MISSION ALIGNMENT',
+      tag: 'GLOBAL IMPACT & SCALABILITY',
       title: 'Empowering FOSS Bitcoin in the Global South',
       subtitle: 'Grassroots Rollout & Open-Source Community Roadmap',
       content: (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginTop: '16px' }}>
           <div style={{ background: 'var(--bg-primary)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--btc-orange)', marginBottom: '4px' }}>Phase 1: Kaduna Pilot</div>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--btc-orange)', marginBottom: '4px' }}>Phase 1: Grassroots Pilot</div>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-              Deploy 50 vendor test terminals across Kasuwan Barci fabric market and Doka tricycle hubs in partnership with local cooperative executives.
+              Deploy 50 vendor test terminals across major market cooperatives and urban transport unions in partnership with local trader associations.
             </p>
           </div>
 
@@ -324,12 +324,12 @@ export const InteractivePitchDeck: React.FC<InteractivePitchDeckProps> = ({ isOp
           <div style={{ background: 'var(--bg-primary)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: '#C4B5FD', marginBottom: '4px' }}>Phase 3: FOSS Ecosystem</div>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-              Publish the open-source offline Cashu audio synthesizer and Adashi engine for other African Bitcoin builders via Btrust open-source grants.
+              Publish the open-source offline Cashu audio synthesizer and Adashi engine for other emerging market Bitcoin builders and ecosystem grants.
             </p>
           </div>
         </div>
       ),
-      speakerNotes: 'Connect directly to Btrust’s founding mandate: self-sovereign, open-source Bitcoin tooling created by and for the Global South.',
+      speakerNotes: 'Connect directly to the core Web3 mission: self-sovereign, open-source Bitcoin tooling created for real-world resilience in emerging economies.',
     },
     {
       id: 8,
