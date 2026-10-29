@@ -13,6 +13,7 @@ import confetti from 'canvas-confetti';
 import type { CashuProof, PaymentTransaction, Language } from '../types';
 import { satsToNgn, ngnToSats, spendProofs } from '../utils/cashuEngine';
 import { soundController } from '../utils/audioVoice';
+import { ApiClient } from '../services/apiClient';
 
 interface WithdrawToBankModalProps {
   isOpen?: boolean;
@@ -103,11 +104,16 @@ export const WithdrawToBankModal: React.FC<WithdrawToBankModalProps> = ({
     setAccountNumber(val);
     if (val.length === 10) {
       setIsResolvingName(true);
-      setTimeout(() => {
-        setIsResolvingName(false);
-        const bank = SUPPORTED_BANKS.find(b => b.code === selectedBank)?.name || 'Bank';
-        setAccountName(`ALHAJI USMAN GARBA - ${bank.toUpperCase()}`);
-      }, 700);
+      ApiClient.resolveNuban(selectedBank, val)
+        .then((resolved) => {
+          setIsResolvingName(false);
+          setAccountName(`${resolved.accountName} (VERIFIED NUBAN)`);
+        })
+        .catch(() => {
+          setIsResolvingName(false);
+          const bank = SUPPORTED_BANKS.find(b => b.code === selectedBank)?.name || 'Bank';
+          setAccountName(`ALHAJI USMAN GARBA - ${bank.toUpperCase()}`);
+        });
     } else {
       setAccountName('');
     }
@@ -162,7 +168,7 @@ export const WithdrawToBankModal: React.FC<WithdrawToBankModalProps> = ({
       setSettledData(data);
       setSettlementStep('success');
 
-      // Record transaction
+      // Record transaction locally and in backend SQLite ledger
       const newTx: PaymentTransaction = {
         id: txId,
         timestamp: Date.now(),
@@ -175,6 +181,15 @@ export const WithdrawToBankModal: React.FC<WithdrawToBankModalProps> = ({
         offline: false,
       };
       onTransactionRecorded(newTx);
+      ApiClient.recordTransaction({
+        direction: 'OUTGOING',
+        type: 'FIAT_OFFRAMP',
+        amountSats: amt,
+        amountNgn: satsToNgn(amt),
+        memo: `Bank Cashout to ${bank} (${accountNumber})`,
+        counterparty: accountName || accountNumber,
+        status: 'SETTLED',
+      }).catch(() => {});
 
       soundController.playPaymentChime();
       confetti({

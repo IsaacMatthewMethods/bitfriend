@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
 import {
@@ -14,6 +14,7 @@ import { generateProof, encodeCashuToken } from '../utils/cashuEngine';
 import { ReceiptModal } from '../components/ReceiptModal';
 import { NfcTapModal } from '../components/NfcTapModal';
 import { QrScannerModal } from '../components/QrScannerModal';
+import { ApiClient } from '../services/apiClient';
 import type { PaymentTransaction } from '../types';
 
 interface PosProduct {
@@ -54,6 +55,26 @@ export const PosPage: React.FC = () => {
   const [newItemPrice, setNewItemPrice] = useState<string>('');
   const [newItemCategory, setNewItemCategory] = useState<string>('General');
 
+  // Load catalog from backend SQLite server on mount
+  useEffect(() => {
+    ApiClient.getPosCatalog()
+      .then((items) => {
+        if (items && items.length > 0) {
+          const mapped: PosProduct[] = items.map((i: any) => ({
+            id: i.id,
+            name: i.name_en,
+            nameHa: i.name_ha || i.name_en,
+            priceNgn: i.price_ngn,
+            category: i.category || 'General',
+          }));
+          setCatalog(mapped);
+        }
+      })
+      .catch(() => {
+        // Tolerates offline cleanly
+      });
+  }, []);
+
   const chargeSats = ngnToSats(chargeNgn);
 
   const categories = ['All', ...Array.from(new Set(catalog.map((c) => c.category)))];
@@ -89,6 +110,16 @@ export const PosPage: React.FC = () => {
     };
     addTransaction(tx);
 
+    // Sync to backend SQLite database
+    ApiClient.recordTransaction({
+      direction: 'INCOMING',
+      type: 'POS_SALE',
+      amountSats: chargeSats,
+      amountNgn: chargeNgn,
+      memo: tx.memo,
+      status: 'SETTLED',
+    }).catch(() => {});
+
     soundController.playPaymentChime();
     soundController.speakReceipt(chargeSats, lang);
     confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
@@ -111,6 +142,14 @@ export const PosPage: React.FC = () => {
     setShowAddItemModal(false);
     setNewItemName('');
     setNewItemPrice('');
+
+    // Persist to backend database
+    ApiClient.addPosItem({
+      nameEn: newProd.name,
+      nameHa: newProd.nameHa,
+      priceNgn: newProd.priceNgn,
+      category: newProd.category,
+    }).catch(() => {});
   };
 
   const copyQrToken = () => {

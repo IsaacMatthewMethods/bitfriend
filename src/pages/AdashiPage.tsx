@@ -12,6 +12,7 @@ import { useMarket } from '../context/MarketContext';
 import { soundController } from '../utils/audioVoice';
 import { broadcastAdashiEvent } from '../utils/nostrClient';
 import { CreateAdashiModal } from '../components/CreateAdashiModal';
+import { ApiClient } from '../services/apiClient';
 import type { AdashiCircle } from '../types';
 
 export const AdashiPage: React.FC = () => {
@@ -47,7 +48,7 @@ export const AdashiPage: React.FC = () => {
     setAdashiNotice(`Contributed ${circle.contributionSats.toLocaleString()} sats to "${circle.name}"!`);
     setTimeout(() => setAdashiNotice(''), 5000);
 
-    // Broadcast over Nostr P2P
+    // Broadcast over Nostr P2P & Backend SQLite sync
     broadcastAdashiEvent({
       action: 'contribute',
       circleId,
@@ -58,6 +59,7 @@ export const AdashiPage: React.FC = () => {
       amountSats: circle.contributionSats,
       timestamp: Date.now(),
     }).catch(console.warn);
+    ApiClient.contributeAdashi(circleId, circle.contributionSats).catch(() => {});
   };
 
   const handleTriggerPayout = (circleId: string) => {
@@ -90,7 +92,7 @@ export const AdashiPage: React.FC = () => {
     setAdashiNotice(`Payout of ${totalPot.toLocaleString()} sats released to ${currentRecipient.name}!`);
     setTimeout(() => setAdashiNotice(''), 5000);
 
-    // Broadcast over Nostr P2P
+    // Broadcast over Nostr P2P & Backend SQLite sync
     broadcastAdashiEvent({
       action: 'turn_payout',
       circleId,
@@ -101,6 +103,7 @@ export const AdashiPage: React.FC = () => {
       amountSats: totalPot,
       timestamp: Date.now(),
     }).catch(console.warn);
+    ApiClient.disburseAdashiPayout(circleId).catch(() => {});
   };
 
   const handleCircleCreated = (newCircle: AdashiCircle) => {
@@ -109,6 +112,14 @@ export const AdashiPage: React.FC = () => {
     confetti({ particleCount: 60, spread: 70 });
     setAdashiNotice(`Launched new cooperative pot: "${newCircle.name}"!`);
     setTimeout(() => setAdashiNotice(''), 5000);
+
+    ApiClient.createAdashiCircle({
+      title: newCircle.name,
+      description: newCircle.category || 'Adashi Savings Circle',
+      cycleType: 'WEEKLY',
+      contributionSats: newCircle.contributionSats,
+      maxRounds: newCircle.totalRounds,
+    }).catch(() => {});
   };
 
   return (
