@@ -1,25 +1,43 @@
 import React, { useState } from 'react';
-import { X, Key, ShieldCheck, Copy, Check, RefreshCw, AlertTriangle } from 'lucide-react';
+import {
+  X,
+  Key,
+  ShieldCheck,
+  Copy,
+  Check,
+  RefreshCw,
+  AlertTriangle,
+  Download,
+  Upload,
+  FileCheck2,
+  Lock
+} from 'lucide-react';
 import {
   getStoredMnemonic,
   saveMnemonic,
   isVaultBackedUp,
   markVaultBackedUp,
 } from '../utils/bip39Vault';
+import {
+  exportDatabaseBackup,
+  importDatabaseBackup,
+} from '../utils/secureStorage';
 import { soundController } from '../utils/audioVoice';
 
 interface VaultBackupModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRestoreSuccess: () => void;
+  onOpenPinSetup?: () => void;
 }
 
 export const VaultBackupModal: React.FC<VaultBackupModalProps> = ({
   isOpen,
   onClose,
   onRestoreSuccess,
+  onOpenPinSetup,
 }) => {
-  const [activeTab, setActiveTab] = useState<'backup' | 'restore'>('backup');
+  const [activeTab, setActiveTab] = useState<'backup' | 'restore' | 'file'>('backup');
   const [mnemonic, setMnemonic] = useState<string[]>(() => getStoredMnemonic());
   const [copied, setCopied] = useState<boolean>(false);
   const [backedUp, setBackedUp] = useState<boolean>(() => isVaultBackedUp());
@@ -28,6 +46,11 @@ export const VaultBackupModal: React.FC<VaultBackupModalProps> = ({
   const [restoreInput, setRestoreInput] = useState<string>('');
   const [restoreError, setRestoreError] = useState<string>('');
   const [restoreSuccess, setRestoreSuccess] = useState<string>('');
+
+  // File Backup & Checksum State
+  const [fileExportSuccess, setFileExportSuccess] = useState<boolean>(false);
+  const [fileImportError, setFileImportError] = useState<string>('');
+  const [fileImportSuccess, setFileImportSuccess] = useState<string>('');
 
   if (!isOpen) return null;
 
@@ -70,52 +93,113 @@ export const VaultBackupModal: React.FC<VaultBackupModalProps> = ({
     }, 1800);
   };
 
+  const handleExportDatabase = async () => {
+    try {
+      const backupJson = await exportDatabaseBackup();
+      const blob = new Blob([backupJson], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bitfriend-encrypted-vault-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setFileExportSuccess(true);
+      soundController.playPaymentChime();
+      setTimeout(() => setFileExportSuccess(false), 3000);
+    } catch (err: unknown) {
+      alert('Failed to export vault database: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const handleImportDatabase = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileImportError('');
+    setFileImportSuccess('');
+
+    try {
+      const text = await file.text();
+      const res = await importDatabaseBackup(text);
+      if (res.success) {
+        soundController.playPaymentChime();
+        setFileImportSuccess('Database backup verified with SHA-256 checksum and restored successfully!');
+        onRestoreSuccess();
+        setTimeout(() => {
+          onClose();
+        }, 1800);
+      } else {
+        soundController.playClick();
+        setFileImportError(res.error || 'Failed to restore backup');
+      }
+    } catch (err: unknown) {
+      setFileImportError('Error parsing backup file: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal-content"
-        style={{ maxWidth: '520px', width: '92%' }}
+        style={{ maxWidth: '540px', width: '92%' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Key size={20} color="var(--btc-orange)" />
-            <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Vault Disaster Recovery (BIP-39)</h3>
+            <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Vault Disaster Recovery & Security</h3>
           </div>
           <button className="modal-close-btn" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
 
-        {/* Tab switch between Backup & Restore */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+        {/* Tab switch */}
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
           <button
             className={`btn-secondary ${activeTab === 'backup' ? 'active' : ''}`}
             style={{
               flex: 1,
-              padding: '8px',
-              fontSize: '13px',
+              padding: '8px 4px',
+              fontSize: '12px',
               borderColor: activeTab === 'backup' ? 'var(--btc-orange)' : 'var(--border-subtle)',
               color: activeTab === 'backup' ? 'var(--btc-orange)' : 'var(--text-secondary)',
             }}
             onClick={() => setActiveTab('backup')}
           >
-            <ShieldCheck size={14} style={{ display: 'inline', marginRight: '6px' }} />
-            View Recovery Phrase
+            <ShieldCheck size={13} style={{ display: 'inline', marginRight: '4px' }} />
+            12-Word Phrase
           </button>
           <button
             className={`btn-secondary ${activeTab === 'restore' ? 'active' : ''}`}
             style={{
               flex: 1,
-              padding: '8px',
-              fontSize: '13px',
+              padding: '8px 4px',
+              fontSize: '12px',
               borderColor: activeTab === 'restore' ? 'var(--btc-orange)' : 'var(--border-subtle)',
               color: activeTab === 'restore' ? 'var(--btc-orange)' : 'var(--text-secondary)',
             }}
             onClick={() => setActiveTab('restore')}
           >
-            <RefreshCw size={14} style={{ display: 'inline', marginRight: '6px' }} />
-            Restore from Phrase
+            <RefreshCw size={13} style={{ display: 'inline', marginRight: '4px' }} />
+            Restore Phrase
+          </button>
+          <button
+            className={`btn-secondary ${activeTab === 'file' ? 'active' : ''}`}
+            style={{
+              flex: 1,
+              padding: '8px 4px',
+              fontSize: '12px',
+              borderColor: activeTab === 'file' ? 'var(--btc-orange)' : 'var(--border-subtle)',
+              color: activeTab === 'file' ? 'var(--btc-orange)' : 'var(--text-secondary)',
+            }}
+            onClick={() => setActiveTab('file')}
+          >
+            <FileCheck2 size={13} style={{ display: 'inline', marginRight: '4px' }} />
+            IndexedDB File
           </button>
         </div>
 
@@ -179,6 +263,32 @@ export const VaultBackupModal: React.FC<VaultBackupModalProps> = ({
                 {backedUp ? '✓ Verified Backed Up' : 'I Wrote These Down'}
               </button>
             </div>
+
+            {onOpenPinSetup && (
+              <div style={{ marginBottom: '12px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    borderColor: 'rgba(247, 147, 26, 0.4)',
+                  }}
+                  onClick={() => {
+                    onClose();
+                    onOpenPinSetup();
+                  }}
+                >
+                  <Lock size={15} color="var(--btc-orange)" />
+                  <span>Configure 6-Digit Encryption PIN Lock</span>
+                </button>
+              </div>
+            )}
 
             <div
               style={{
@@ -245,6 +355,94 @@ export const VaultBackupModal: React.FC<VaultBackupModalProps> = ({
             >
               <RefreshCw size={16} /> Restore Ecash Vault
             </button>
+          </div>
+        )}
+
+        {activeTab === 'file' && (
+          <div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+              Export an encrypted, tamper-evident database file containing all your offline proofs, Adashi circles, and transaction ledger protected by a cryptographic SHA-256 checksum.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                onClick={handleExportDatabase}
+              >
+                <Download size={16} />
+                <span>{fileExportSuccess ? '✓ Database Downloaded!' : 'Export Encrypted Database (.json)'}</span>
+              </button>
+
+              <label
+                className="btn-secondary"
+                style={{
+                  padding: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                }}
+              >
+                <Upload size={16} />
+                <span>Import & Validate Database Checksum</span>
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  style={{ display: 'none' }}
+                  onChange={handleImportDatabase}
+                />
+              </label>
+            </div>
+
+            {fileImportError && (
+              <div
+                style={{
+                  color: '#ef4444',
+                  fontSize: '12px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  marginBottom: '10px',
+                }}
+              >
+                {fileImportError}
+              </div>
+            )}
+
+            {fileImportSuccess && (
+              <div
+                style={{
+                  color: '#10b981',
+                  fontSize: '12px',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  marginBottom: '10px',
+                  fontWeight: 600,
+                }}
+              >
+                {fileImportSuccess}
+              </div>
+            )}
+
+            <div
+              style={{
+                fontSize: '11px',
+                color: 'var(--text-muted)',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '10px',
+              }}
+            >
+              🔒 <strong>Integrity Guaranteed:</strong> Every export computes a SHA-256 hash. If even a single byte is altered in transit, the checksum verification rejects the restore.
+            </div>
           </div>
         )}
       </div>

@@ -32,7 +32,9 @@ import {
   Smartphone,
   Sliders,
   MessageSquare,
-  Upload
+  Upload,
+  Lock,
+  KeyRound
 } from 'lucide-react';
 import type { Language, CashuProof, PaymentTransaction, AdashiCircle } from './types';
 import { getTranslation } from './utils/translations';
@@ -53,6 +55,18 @@ import { soundController } from './utils/audioVoice';
 import { isWebLNAvailable, requestWebLNPayment } from './utils/webln';
 import { isVaultBackedUp } from './utils/bip39Vault';
 import { exportVaultBackupFile, parseVaultBackupFile } from './utils/vaultBackup';
+import {
+  isPinConfigured,
+  lockVault,
+  subscribeLockState,
+  migrateFromLocalStorage,
+  getSecureProofs,
+  getSecureTransactions,
+  getSecureCircles,
+  saveSecureProofs,
+  saveSecureTransactions,
+  saveSecureCircles
+} from './utils/secureStorage';
 import { QrScannerModal } from './components/QrScannerModal';
 import { CreateAdashiModal } from './components/CreateAdashiModal';
 import { ReceiptModal, exportTransactionsToCsv } from './components/ReceiptModal';
@@ -64,6 +78,8 @@ import { MultiMintMonitor } from './components/MultiMintMonitor';
 import { InteractivePitchDeck } from './components/InteractivePitchDeck';
 import { MarketSimulationLab } from './components/MarketSimulationLab';
 import { SmsBeamModal } from './components/SmsBeamModal';
+import { PinLockModal } from './components/PinLockModal';
+import { BitChatView } from './components/chat/BitChatView';
 import './App.css';
 
 // Initial Adashi Circles for Grassroots Merchants
@@ -143,7 +159,7 @@ export const App: React.FC = () => {
   const [lang, setLang] = useState<Language>('ha');
   const [isOffline, setIsOffline] = useState<boolean>(() => !navigator.onLine);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'pos' | 'vault' | 'adashi' | 'history'>('pos');
+  const [activeTab, setActiveTab] = useState<'pos' | 'bitchat' | 'vault' | 'adashi' | 'history'>('pos');
   
   // Modals
   const [showPitchModal, setShowPitchModal] = useState<boolean>(false);
@@ -158,6 +174,10 @@ export const App: React.FC = () => {
   const [showMultiMintModal, setShowMultiMintModal] = useState<boolean>(false);
   const [showSimulationLab, setShowSimulationLab] = useState<boolean>(false);
   const [showSmsBeam, setShowSmsBeam] = useState<boolean>(false);
+  const [showPinModal, setShowPinModal] = useState<boolean>(false);
+  const [pinModalMode, setPinModalMode] = useState<'unlock' | 'setup'>('unlock');
+  const [hasConfiguredPin, setHasConfiguredPin] = useState<boolean>(false);
+  const [isVaultLockedState, setIsVaultLockedState] = useState<boolean>(false);
   
   const [activeMintUrl, setActiveMintUrl] = useState<string>(getCustomMint());
   const [vaultBackedUp, setVaultBackedUp] = useState<boolean>(() => isVaultBackedUp());
@@ -245,10 +265,51 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  // Load stored proofs on mount
+  // Load stored proofs and migrate to encrypted IndexedDB on mount
   useEffect(() => {
-    const loaded = getStoredProofs();
-    setProofs(loaded);
+    let mounted = true;
+
+    // Migrate from localStorage to encrypted IndexedDB with zero data loss
+    migrateFromLocalStorage().then(async () => {
+      try {
+        const [secProofs, secTxs, secCircles, pinSet] = await Promise.all([
+          getSecureProofs(),
+          getSecureTransactions(),
+          getSecureCircles(),
+          isPinConfigured(),
+        ]);
+        if (mounted) {
+          if (secProofs && secProofs.length > 0) setProofs(secProofs);
+          else setProofs(getStoredProofs());
+          if (secTxs && secTxs.length > 0) setTransactions(secTxs);
+          if (secCircles && secCircles.length > 0) setCircles(secCircles);
+          setHasConfiguredPin(pinSet);
+        }
+      } catch (err) {
+        console.warn('Secure storage initial load notice:', err);
+        if (mounted) setProofs(getStoredProofs());
+      }
+    });
+
+    // Subscribe to PIN auto-lock events (e.g. 5 minutes inactivity)
+    const unsubscribe = subscribeLockState((locked) => {
+      if (mounted) {
+        setIsVaultLockedState(locked);
+        if (locked) {
+          isPinConfigured().then(configured => {
+            if (configured && mounted) {
+              setPinModalMode('unlock');
+              setShowPinModal(true);
+            }
+          });
+        }
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
   // Update sound controller
@@ -256,19 +317,28 @@ export const App: React.FC = () => {
     soundController.enabled = soundEnabled;
   }, [soundEnabled]);
 
-  // Save transactions to storage
+  // Save proofs to secure storage & localStorage
+  useEffect(() => {
+    if (proofs.length > 0) {
+      saveSecureProofs(proofs).catch(err => console.warn('Secure save proofs error:', err));
+    }
+  }, [proofs]);
+
+  // Save transactions to secure storage & localStorage
   useEffect(() => {
     try {
       localStorage.setItem('bitfriend_tx_history', JSON.stringify(transactions));
+      saveSecureTransactions(transactions).catch(err => console.warn('Secure save txs error:', err));
     } catch (err) {
       console.warn('Failed to save transactions', err);
     }
   }, [transactions]);
 
-  // Save circles to storage
+  // Save circles to secure storage & localStorage
   useEffect(() => {
     try {
       localStorage.setItem('bitfriend_adashi_circles', JSON.stringify(circles));
+      saveSecureCircles(circles).catch(err => console.warn('Secure save circles error:', err));
     } catch (err) {
       console.warn('Failed to save circles', err);
     }
@@ -735,6 +805,31 @@ export const App: React.FC = () => {
             <Sliders size={15} />
           </button>
 
+          {/* Security & PIN Lock Button */}
+          <button
+            className="ctrl-btn"
+            style={{
+              borderColor: hasConfiguredPin ? 'rgba(16, 185, 129, 0.5)' : 'rgba(247, 147, 26, 0.5)',
+              color: hasConfiguredPin ? '#10b981' : 'var(--btc-orange)',
+              gap: '4px',
+            }}
+            onClick={() => {
+              if (hasConfiguredPin) {
+                lockVault();
+                setPinModalMode('unlock');
+                setShowPinModal(true);
+              } else {
+                setPinModalMode('setup');
+                setShowPinModal(true);
+              }
+              soundController.playClick();
+            }}
+            title={hasConfiguredPin ? 'Lock Ecash Vault (AES-GCM)' : 'Set 6-Digit Encryption PIN'}
+          >
+            {hasConfiguredPin ? <Lock size={15} /> : <KeyRound size={15} />}
+            <span style={{ fontSize: '11px', fontWeight: 600 }}>{hasConfiguredPin ? 'Lock' : 'Set PIN'}</span>
+          </button>
+
           {/* Judge Pitch Deck Button */}
           <button
             className="ctrl-btn"
@@ -813,6 +908,17 @@ export const App: React.FC = () => {
         >
           <Store size={18} />
           {t.posTab}
+        </button>
+
+        <button
+          className={`tab-btn ${activeTab === 'bitchat' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('bitchat');
+            soundController.playClick();
+          }}
+        >
+          <MessageSquare size={18} />
+          {t.chatTab || 'BitChat'}
         </button>
 
         <button
@@ -1064,6 +1170,19 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {/* TAB: BITCHAT SOCIAL BITCOIN MESSENGER */}
+      {activeTab === 'bitchat' && (
+        <BitChatView
+          lang={lang}
+          vaultProofs={proofs}
+          onVaultProofsChanged={updated => {
+            setProofs(updated);
+            saveStoredProofs(updated);
+          }}
+          isOffline={isOffline}
+        />
+      )}
+
       {/* TAB 2: OFFLINE ECASH VAULT */}
       {activeTab === 'vault' && (
         <div className="card">
@@ -1126,6 +1245,55 @@ export const App: React.FC = () => {
                 {t.sweepToLightning}
               </button>
             </div>
+          </div>
+
+          {/* Encrypted IndexedDB & PIN Security Pill */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.08) 0%, rgba(247, 147, 26, 0.08) 100%)',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              borderRadius: 'var(--radius-md)',
+              padding: '10px 14px',
+              marginTop: '12px',
+              marginBottom: '14px',
+              fontSize: '12px',
+              flexWrap: 'wrap',
+              gap: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={16} color="#10b981" />
+              <span>
+                <strong>IndexedDB Encrypted at Rest:</strong> WebCrypto PBKDF2 + AES-GCM 256-bit {hasConfiguredPin ? '🔒 (Protected by 6-digit PIN)' : '⚠️ (Unencrypted — set PIN to lock)'}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{
+                width: 'auto',
+                padding: '4px 10px',
+                fontSize: '11px',
+                borderColor: hasConfiguredPin ? '#10b981' : 'var(--btc-orange)',
+                color: hasConfiguredPin ? '#10b981' : 'var(--btc-orange)',
+              }}
+              onClick={() => {
+                if (hasConfiguredPin) {
+                  lockVault();
+                  setPinModalMode('unlock');
+                  setShowPinModal(true);
+                } else {
+                  setPinModalMode('setup');
+                  setShowPinModal(true);
+                }
+                soundController.playClick();
+              }}
+            >
+              {hasConfiguredPin ? 'Lock Vault Now' : 'Set 6-Digit PIN'}
+            </button>
           </div>
 
           {/* Denominations breakdown */}
@@ -1478,13 +1646,36 @@ export const App: React.FC = () => {
         onMintChanged={() => setActiveMintUrl(getCustomMint())}
       />
 
-      {/* MODAL: BIP-39 VAULT DISASTER RECOVERY */}
+      {/* MODAL: BIP-39 VAULT DISASTER RECOVERY & DATABASE INTEGRITY */}
       <VaultBackupModal
         isOpen={showBackupModal}
         onClose={() => setShowBackupModal(false)}
+        onOpenPinSetup={() => {
+          setPinModalMode('setup');
+          setShowPinModal(true);
+        }}
         onRestoreSuccess={() => {
-          setProofs(getStoredProofs());
+          getSecureProofs().then(p => {
+            if (p && p.length > 0) setProofs(p);
+            else setProofs(getStoredProofs());
+          }).catch(() => setProofs(getStoredProofs()));
           setVaultBackedUp(isVaultBackedUp());
+        }}
+      />
+
+      {/* MODAL: 6-DIGIT AES-GCM PIN LOCK */}
+      <PinLockModal
+        isOpen={showPinModal}
+        lang={lang}
+        initialMode={pinModalMode}
+        allowDismiss={!hasConfiguredPin || !isVaultLockedState}
+        onClose={() => setShowPinModal(false)}
+        onSuccess={() => {
+          setShowPinModal(false);
+          setHasConfiguredPin(true);
+          getSecureProofs().then(p => {
+            if (p && p.length > 0) setProofs(p);
+          }).catch(console.warn);
         }}
       />
 

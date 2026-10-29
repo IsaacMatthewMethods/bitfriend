@@ -54,26 +54,26 @@ graph TD
 ### Phase 1: Client Storage Hardening & IndexedDB Encryption
 > **Goal:** Eliminate browser localStorage limits and secure on-device bearer tokens with PIN-derived AES-GCM encryption.
 
-- [ ] **Task 1.1:** Install and configure client-side database layer (`npm install idb` or `dexie`).
-- [ ] **Task 1.2:** Implement `src/utils/secureStorage.ts` with WebCrypto PBKDF2 key derivation and AES-GCM 256-bit encryption for stored proofs.
-- [ ] **Task 1.3:** Create a 6-digit PIN lock screen modal with auto-lock timer (after 5 minutes of inactivity).
-- [ ] **Task 1.4:** Migrate existing `localStorage` proofs, transaction history, and Adashi circles into encrypted IndexedDB with zero data loss.
-- [ ] **Task 1.5:** Add automatic database export/import integrity checksums and automated schema versioning.
-- [ ] **Verification 1.6:** Run `npm run build` and verify that closing the browser and clearing cookies does not destroy encrypted tokens if user has PIN/seed.
+- [x] **Task 1.1:** Install and configure client-side database layer (`npm install idb` or `dexie`).
+- [x] **Task 1.2:** Implement `src/utils/secureStorage.ts` with WebCrypto PBKDF2 key derivation and AES-GCM 256-bit encryption for stored proofs.
+- [x] **Task 1.3:** Create a 6-digit PIN lock screen modal with auto-lock timer (after 5 minutes of inactivity).
+- [x] **Task 1.4:** Migrate existing `localStorage` proofs, transaction history, and Adashi circles into encrypted IndexedDB with zero data loss.
+- [x] **Task 1.5:** Add automatic database export/import integrity checksums and automated schema versioning.
+- [x] **Verification 1.6:** Run `npm run build` and verify that closing the browser and clearing cookies does not destroy encrypted tokens if user has PIN/seed.
 
 ---
 
 ### Phase 2: "BitChat" Social Messenger & In-Chat Token Transfers
 > **Goal:** Build the WhatsApp-style social messaging tab with inline Bitcoin zaps, audio receipts, and offline voucher bubbles.
 
-- [ ] **Task 2.1:** Create data models in `src/types/index.ts` for `ChatMessage`, `ChatContact`, and `InlinePaymentPayload`.
-- [ ] **Task 2.2:** Build `src/components/chat/BitChatView.tsx` with conversation list, contact roster, search bar, and unread badges.
-- [ ] **Task 2.3:** Build `src/components/chat/ChatConversation.tsx` with WhatsApp-style bubble rendering, timestamp formatting, and read receipts.
-- [ ] **Task 2.4:** Build `src/components/chat/InChatSendSatsModal.tsx` for entering satoshi amounts with instant Naira exchange rate conversion.
-- [ ] **Task 2.5:** Create interactive `src/components/chat/PaymentBubbleCard.tsx` displaying denomination chips, status (`pending`, `claimed`), and 1-click "Claim to Vault" handler.
-- [ ] **Task 2.6:** Wire BitChat as a primary navigation tab in `src/App.tsx` alongside POS, Vault, Adashi, and History.
-- [ ] **Task 2.7:** Implement local fallback message queue in IndexedDB so messages sent offline are cached and tagged as "Waiting for Network".
-- [ ] **Verification 2.8:** Verify smooth 60fps scrolling, instant local message dispatch, audio chime on send/receive, and 0 TypeScript build errors.
+- [x] **Task 2.1:** Create data models in `src/types/index.ts` for `ChatMessage`, `ChatContact`, and `InlinePaymentPayload`.
+- [x] **Task 2.2:** Build `src/components/chat/BitChatView.tsx` with conversation list, contact roster, search bar, and unread badges.
+- [x] **Task 2.3:** Build `src/components/chat/ChatConversation.tsx` with WhatsApp-style bubble rendering, timestamp formatting, and read receipts.
+- [x] **Task 2.4:** Build `src/components/chat/InChatSendSatsModal.tsx` for entering satoshi amounts with instant Naira exchange rate conversion.
+- [x] **Task 2.5:** Create interactive `src/components/chat/PaymentBubbleCard.tsx` displaying denomination chips, status (`pending`, `claimed`), and 1-click "Claim to Vault" handler.
+- [x] **Task 2.6:** Wire BitChat as a primary navigation tab in `src/App.tsx` alongside POS, Vault, Adashi, and History.
+- [x] **Task 2.7:** Implement local fallback message queue in IndexedDB so messages sent offline are cached and tagged as "Waiting for Network".
+- [x] **Verification 2.8:** Verify smooth 60fps scrolling, instant local message dispatch, audio chime on send/receive, and 0 TypeScript build errors.
 
 ---
 
@@ -132,10 +132,10 @@ This section allows any Antigravity AI session to resume work immediately. The a
 
 ```yaml
 ANTIGRAVITY_RESUME_STATE:
-  active_phase: "Phase 1: Client Storage Hardening & IndexedDB Encryption"
-  current_task: "Task 1.1: Install and configure client-side database layer"
-  last_checkpoint: "Hackathon prototype verified with 0 build errors. Ready for Phase 1 execution."
-  next_action: "Install idb/dexie and create src/utils/secureStorage.ts"
+  active_phase: "Phase 3: Nostr P2P Relay Transport & Real Multi-Device Adashi"
+  current_task: "Task 3.1: Install nostr-tools (npm install nostr-tools)"
+  last_checkpoint: "Phase 1 (Storage Hardening & IndexedDB) & Phase 2 (BitChat Social Messenger) completed and verified with 0 build errors."
+  next_action: "Install nostr-tools and implement src/utils/nostrClient.ts with NIP-44 encrypted messaging and multi-device relay pool"
   build_command: "npm run build"
   dev_server_command: "npm run dev"
   dev_url: "http://localhost:5173/"

@@ -50,3 +50,46 @@ export interface AdashiCircle {
   totalRounds: number;
   nextPayoutDate: string;
 }
+
+// BitChat Social Messenger Data Models
+export interface InlinePaymentPayload {
+  amountSats: number;
+  amountNgn: number;
+  tokenString: string;
+  mintUrl: string;
+  memo?: string;
+  status: 'pending' | 'claimed' | 'expired';
+  claimedAt?: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string; // 'me' | contactId
+  senderName: string;
+  text?: string;
+  timestamp: number;
+  status: 'sending' | 'sent' | 'delivered' | 'read' | 'offline_queued';
+  payment?: InlinePaymentPayload;
+  audioNoteUrl?: string;
+  audioDurationSec?: number;
+}
+
+export interface ChatContact {
+  id: string;
+  name: string;
+  phoneOrHandle: string; // "+234 803 123 4567" or "aminu@bitfriend.me"
+  avatar: string;
+  role?: string;
+  lastSeen?: string;
+  isOnline?: boolean;
+  lightningAddress?: string;
+  nostrNpub?: string;
+  unreadCount: number;
+  lastMessage?: {
+    text: string;
+    timestamp: number;
+    isPayment?: boolean;
+    amountSats?: number;
+  };
+}
