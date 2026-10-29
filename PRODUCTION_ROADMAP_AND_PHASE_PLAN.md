@@ -80,13 +80,13 @@ graph TD
 ### Phase 3: Nostr P2P Relay Transport & Real Multi-Device Adashi
 > **Goal:** Connect BitChat and Adashi circles to decentralized Nostr relays so users on different devices communicate in real-time without a central server.
 
-- [ ] **Task 3.1:** Install `nostr-tools` (`npm install nostr-tools`).
-- [ ] **Task 3.2:** Implement `src/utils/nostrClient.ts` to derive Nostr pubkey/seckey from the user's BIP-39 mnemonic seed phrase.
-- [ ] **Task 3.3:** Configure automatic connection pool to 3 reliable, high-speed relays (e.g. `wss://relay.damus.io`, `wss://nos.lol`, `wss://relay.primal.net`).
-- [ ] **Task 3.4:** Implement NIP-44 encrypted direct messaging for BitChat between contact pubkeys.
-- [ ] **Task 3.5:** Implement Adashi multi-device coordinator: broadcast circle state events, contribution proofs, and rotating turn notifications over Nostr channels.
-- [ ] **Task 3.6:** Add connection status indicator in the header (e.g. `3 Relays Connected`).
-- [ ] **Verification 3.7:** Test two distinct browser sessions sending live encrypted text and bearer tokens over Nostr relays.
+- [x] **Task 3.1:** Install `nostr-tools` (`npm install nostr-tools`).
+- [x] **Task 3.2:** Implement `src/utils/nostrClient.ts` to derive Nostr pubkey/seckey from the user's BIP-39 mnemonic seed phrase.
+- [x] **Task 3.3:** Configure automatic connection pool to 3 reliable, high-speed relays (e.g. `wss://relay.damus.io`, `wss://nos.lol`, `wss://relay.primal.net`).
+- [x] **Task 3.4:** Implement NIP-44 encrypted direct messaging for BitChat between contact pubkeys.
+- [x] **Task 3.5:** Implement Adashi multi-device coordinator: broadcast circle state events, contribution proofs, and rotating turn notifications over Nostr channels.
+- [x] **Task 3.6:** Add connection status indicator in the header (e.g. `3 Relays Connected`).
+- [x] **Verification 3.7:** Test two distinct browser sessions sending live encrypted text and bearer tokens over Nostr relays.
 
 ---
 
@@ -132,10 +132,10 @@ This section allows any Antigravity AI session to resume work immediately. The a
 
 ```yaml
 ANTIGRAVITY_RESUME_STATE:
-  active_phase: "Phase 3: Nostr P2P Relay Transport & Real Multi-Device Adashi"
-  current_task: "Task 3.1: Install nostr-tools (npm install nostr-tools)"
-  last_checkpoint: "Phase 1 (Storage Hardening & IndexedDB) & Phase 2 (BitChat Social Messenger) completed and verified with 0 build errors."
-  next_action: "Install nostr-tools and implement src/utils/nostrClient.ts with NIP-44 encrypted messaging and multi-device relay pool"
+  active_phase: "Phase 4: Production Cashu Mint & Double-Spend Protection (NUT-03)"
+  current_task: "Task 4.3: Implement NUT-03 automatic proof swapping in src/utils/cashuEngine.ts and NUT-07 state check"
+  last_checkpoint: "Phase 1, Phase 2, and Phase 3 (Nostr P2P Relay Transport & Multi-Device Adashi) completed and verified with 0 build errors."
+  next_action: "Implement NUT-03 automatic proof swap on network reconnect and NUT-07 spent proof check in cashuEngine.ts"
   build_command: "npm run build"
   dev_server_command: "npm run dev"
   dev_url: "http://localhost:5173/"

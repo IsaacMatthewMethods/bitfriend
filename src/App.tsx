@@ -80,6 +80,12 @@ import { MarketSimulationLab } from './components/MarketSimulationLab';
 import { SmsBeamModal } from './components/SmsBeamModal';
 import { PinLockModal } from './components/PinLockModal';
 import { BitChatView } from './components/chat/BitChatView';
+import {
+  testRelayConnections,
+  subscribeRelayStatus,
+  broadcastAdashiEvent,
+  subscribeToAdashiCircleEvents
+} from './utils/nostrClient';
 import './App.css';
 
 // Initial Adashi Circles for Grassroots Merchants
@@ -178,6 +184,7 @@ export const App: React.FC = () => {
   const [pinModalMode, setPinModalMode] = useState<'unlock' | 'setup'>('unlock');
   const [hasConfiguredPin, setHasConfiguredPin] = useState<boolean>(false);
   const [isVaultLockedState, setIsVaultLockedState] = useState<boolean>(false);
+  const [connectedRelays, setConnectedRelays] = useState<number>(3);
   
   const [activeMintUrl, setActiveMintUrl] = useState<string>(getCustomMint());
   const [vaultBackedUp, setVaultBackedUp] = useState<boolean>(() => isVaultBackedUp());
@@ -306,9 +313,33 @@ export const App: React.FC = () => {
       }
     });
 
+    // Nostr Relay Status & Multi-Device Adashi Sync
+    const unsubRelay = subscribeRelayStatus((count) => {
+      if (mounted) setConnectedRelays(count);
+    });
+    testRelayConnections().catch(console.warn);
+
+    const unsubAdashi = subscribeToAdashiCircleEvents('circle-1', (payload) => {
+      if (!mounted) return;
+      if (payload.action === 'contribute' && payload.memberId !== 'm3') {
+        soundController.playPaymentChime();
+        setCircles(prev =>
+          prev.map(c => {
+            if (c.id !== payload.circleId) return c;
+            const updatedMembers = c.members.map(m =>
+              m.id === payload.memberId ? { ...m, hasContributed: true } : m
+            );
+            return { ...c, members: updatedMembers };
+          })
+        );
+      }
+    });
+
     return () => {
       mounted = false;
       unsubscribe();
+      unsubRelay();
+      unsubAdashi();
     };
   }, []);
 
@@ -602,6 +633,18 @@ export const App: React.FC = () => {
     setAdashiNotice(`Contributed ${circle.contributionSats} sats to ${circle.name}!`);
     setTimeout(() => setAdashiNotice(''), 4000);
 
+    // Broadcast contribution over Nostr relays for real multi-device sync
+    broadcastAdashiEvent({
+      action: 'contribute',
+      circleId: circle.id,
+      circleName: circle.name,
+      round: circle.currentRound,
+      memberId: 'm3',
+      memberName: 'Amina Garba (You)',
+      amountSats: circle.contributionSats,
+      timestamp: Date.now(),
+    }).catch(console.warn);
+
     const newTx: PaymentTransaction = {
       id: `adashi-pay-${Date.now()}`,
       timestamp: Date.now(),
@@ -630,6 +673,18 @@ export const App: React.FC = () => {
       setProofs(updated);
       saveStoredProofs(updated);
     }
+
+    // Broadcast Adashi round payout notification over Nostr
+    broadcastAdashiEvent({
+      action: 'turn_payout',
+      circleId: circle.id,
+      circleName: circle.name,
+      round: circle.currentRound,
+      memberId: currentRecipient.id,
+      memberName: currentRecipient.name,
+      amountSats: potAmount,
+      timestamp: Date.now(),
+    }).catch(console.warn);
 
     setCircles(prev =>
       prev.map(c => {
@@ -828,6 +883,26 @@ export const App: React.FC = () => {
           >
             {hasConfiguredPin ? <Lock size={15} /> : <KeyRound size={15} />}
             <span style={{ fontSize: '11px', fontWeight: 600 }}>{hasConfiguredPin ? 'Lock' : 'Set PIN'}</span>
+          </button>
+
+          {/* Nostr P2P Relay Indicator */}
+          <button
+            className="ctrl-btn"
+            style={{
+              borderColor: connectedRelays > 0 ? 'rgba(168, 85, 247, 0.4)' : 'rgba(255, 255, 255, 0.1)',
+              color: connectedRelays > 0 ? '#c084fc' : '#94a3b8',
+              gap: '4px',
+            }}
+            onClick={() => {
+              testRelayConnections();
+              soundController.playClick();
+            }}
+            title={`Nostr P2P Relays: ${connectedRelays} Connected (damus.io, nos.lol, primal.net)`}
+          >
+            <Radio size={14} color={connectedRelays > 0 ? '#c084fc' : '#94a3b8'} />
+            <span style={{ fontSize: '11px', fontWeight: 600 }}>
+              {connectedRelays > 0 ? `${connectedRelays} Relays` : 'Relays Off'}
+            </span>
           </button>
 
           {/* Judge Pitch Deck Button */}

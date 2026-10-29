@@ -20,6 +20,7 @@ import {
   getSecureMessages,
   saveSecureMessage
 } from '../../utils/secureStorage';
+import { sendNip44ChatMessage, getCurrentNostrIdentity } from '../../utils/nostrClient';
 
 interface ChatConversationProps {
   contact: ChatContact;
@@ -85,6 +86,12 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
     setInputText('');
     await saveSecureMessage(newMsg);
 
+    // Broadcast over Nostr P2P relays if online
+    if (!isOffline) {
+      const recipientPubkey = contact.nostrNpub || getCurrentNostrIdentity().pubkey;
+      sendNip44ChatMessage(recipientPubkey, newMsg).catch(console.warn);
+    }
+
     // If online, simulate automated response from merchant after 1.5s
     if (!isOffline && contact.isOnline) {
       setTimeout(async () => {
@@ -128,6 +135,12 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
 
     setMessages(prev => [...prev, paymentMsg]);
     await saveSecureMessage(paymentMsg);
+
+    // Broadcast payment voucher over Nostr relays
+    if (!isOffline) {
+      const recipientPubkey = contact.nostrNpub || getCurrentNostrIdentity().pubkey;
+      sendNip44ChatMessage(recipientPubkey, paymentMsg).catch(console.warn);
+    }
   };
 
   // Push-to-Talk Voice Note Simulation
