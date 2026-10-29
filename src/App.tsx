@@ -27,8 +27,6 @@ import {
   Plus,
   Radio,
   Key,
-  AtSign,
-  Activity,
   Smartphone,
   Sliders,
   MessageSquare,
@@ -128,6 +126,23 @@ const INITIAL_CIRCLES: AdashiCircle[] = [
   },
 ];
 
+interface MarketProduct {
+  id: string;
+  name: string;
+  nameHa: string;
+  priceNgn: number;
+  category: string;
+}
+
+const SAMPLE_PRODUCTS: MarketProduct[] = [
+  { id: 'p1', name: 'Ankara Fabric (6 Yds)', nameHa: 'Atamfa (Yadi 6)', priceNgn: 5000, category: 'Apparel' },
+  { id: 'p2', name: 'Grain & Rice Bag (5kg)', nameHa: 'Buhun Shinkafa (5kg)', priceNgn: 4500, category: 'Food' },
+  { id: 'p3', name: 'Fresh Market Tomatoes', nameHa: 'Tumatir na Kasuwa', priceNgn: 1500, category: 'Farm' },
+  { id: 'p4', name: 'Pure Shea Butter Balm', nameHa: 'Man Kadanya', priceNgn: 1000, category: 'Cosmetics' },
+  { id: 'p5', name: 'Spiced Tea & Masa Snack', nameHa: 'Shayi da Masa', priceNgn: 600, category: 'Snack' },
+  { id: 'p6', name: 'Phone Airtime / 2GB Data', nameHa: 'Katin Waya & Data', priceNgn: 1200, category: 'Telecom' },
+];
+
 const INITIAL_TRANSACTIONS: PaymentTransaction[] = [
   {
     id: 'tx-001',
@@ -165,10 +180,10 @@ const INITIAL_TRANSACTIONS: PaymentTransaction[] = [
 ];
 
 export const App: React.FC = () => {
-  const [lang, setLang] = useState<Language>('ha');
+  const [lang, setLang] = useState<Language>('en');
   const [isOffline, setIsOffline] = useState<boolean>(() => !navigator.onLine);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'pos' | 'bitchat' | 'vault' | 'adashi' | 'history'>('pos');
+  const [activeTab, setActiveTab] = useState<'pos' | 'bitchat' | 'bank' | 'adashi' | 'vault' | 'history' | 'lab'>('pos');
   
   // Modals
   const [showPitchModal, setShowPitchModal] = useState<boolean>(false);
@@ -777,13 +792,45 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-container">
+      {/* Real-Time Live Ticker Tape */}
+      <div className="superapp-ticker">
+        <div className="ticker-item">
+          <span className="pulse-dot" style={{ background: '#10b981' }}></span>
+          <span>Live Exchange:</span>
+          <strong>1 BTC = ₦{(BTC_TO_NGN_RATE / 1000000).toFixed(1)}M NGN</strong>
+          <span style={{ color: 'var(--text-muted)' }}>(1 sat ≈ ₦{(BTC_TO_NGN_RATE / 100000000).toFixed(2)})</span>
+        </div>
+        <div className="ticker-item">
+          <span className="pulse-dot" style={{ background: '#c084fc' }}></span>
+          <span>Nostr P2P:</span>
+          <strong>{connectedRelays > 0 ? `${connectedRelays} Relays Live` : 'Connecting...'}</strong>
+        </div>
+        <div className="ticker-item">
+          <span className="pulse-dot" style={{ background: '#f59e0b' }}></span>
+          <span>Vault Encryption:</span>
+          <strong>WebCrypto PBKDF2 + AES-256</strong>
+        </div>
+        <div className="ticker-item">
+          <span className="pulse-dot" style={{ background: '#38bdf8' }}></span>
+          <span>Mint Protocol:</span>
+          <strong>Cashu NUT-03 / NUT-07 Armed</strong>
+        </div>
+      </div>
+
       {/* Header & Brand */}
       <header className="app-header">
         <div className="brand-section">
           <div className="brand-logo">₿</div>
           <div className="brand-info">
-            <h1>{t.appTitle}</h1>
-            <span className="badge-pill">Bitcoin & Web3 Hackathon 2026</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 style={{ margin: 0 }}>{t.appTitle}</h1>
+              <span className="badge-pill" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
+                v2.4 Super-App
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              The Grassroots African Bitcoin & Ecash Operating System
+            </div>
           </div>
         </div>
 
@@ -815,6 +862,19 @@ export const App: React.FC = () => {
             {isOffline ? t.offline : t.online}
           </button>
 
+          {/* Language Toggle */}
+          <button
+            className="ctrl-btn"
+            style={{ fontWeight: 600 }}
+            onClick={() => {
+              setLang(lang === 'en' ? 'ha' : 'en');
+              soundController.playClick();
+            }}
+            title="Switch Language (Hausa / English)"
+          >
+            {lang === 'en' ? '🇳🇬 Hausa' : '🇬🇧 English'}
+          </button>
+
           {/* Sound Toggle */}
           <button
             className="ctrl-btn"
@@ -822,56 +882,9 @@ export const App: React.FC = () => {
               setSoundEnabled(!soundEnabled);
               soundController.playClick();
             }}
-            title={soundEnabled ? t.soundOn : t.soundOff}
+            title={soundEnabled ? 'Mute Voice Receipts' : 'Enable Voice Receipts'}
           >
             {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-          </button>
-
-          {/* Language Toggle */}
-          <button
-            className="ctrl-btn"
-            onClick={() => {
-              setLang(lang === 'en' ? 'ha' : 'en');
-              soundController.playClick();
-            }}
-          >
-            {lang === 'en' ? '🇳🇬 Hausa' : '🇬🇧 English'}
-          </button>
-
-          {/* Lightning Address / LNURL button */}
-          <button
-            className="ctrl-btn"
-            onClick={() => {
-              setShowLnAddressModal(true);
-              soundController.playClick();
-            }}
-            title="Merchant Lightning Address"
-          >
-            <AtSign size={15} />
-          </button>
-
-          {/* Multi-Mint Latency Monitor */}
-          <button
-            className="ctrl-btn"
-            onClick={() => {
-              setShowMultiMintModal(true);
-              soundController.playClick();
-            }}
-            title="Global Mint Latency Monitor"
-          >
-            <Activity size={15} />
-          </button>
-
-          {/* Market Simulation Lab */}
-          <button
-            className="ctrl-btn"
-            onClick={() => {
-              setShowSimulationLab(true);
-              soundController.playClick();
-            }}
-            title="Market Simulation Lab & Stress Test"
-          >
-            <Sliders size={15} />
           </button>
 
           {/* Security & PIN Lock Button */}
@@ -896,55 +909,69 @@ export const App: React.FC = () => {
             title={hasConfiguredPin ? 'Lock Ecash Vault (AES-GCM)' : 'Set 6-Digit Encryption PIN'}
           >
             {hasConfiguredPin ? <Lock size={15} /> : <KeyRound size={15} />}
-            <span style={{ fontSize: '11px', fontWeight: 600 }}>{hasConfiguredPin ? 'Lock' : 'Set PIN'}</span>
-          </button>
-
-          {/* Nostr P2P Relay Indicator */}
-          <button
-            className="ctrl-btn"
-            style={{
-              borderColor: connectedRelays > 0 ? 'rgba(168, 85, 247, 0.4)' : 'rgba(255, 255, 255, 0.1)',
-              color: connectedRelays > 0 ? '#c084fc' : '#94a3b8',
-              gap: '4px',
-            }}
-            onClick={() => {
-              testRelayConnections();
-              soundController.playClick();
-            }}
-            title={`Nostr P2P Relays: ${connectedRelays} Connected (damus.io, nos.lol, primal.net)`}
-          >
-            <Radio size={14} color={connectedRelays > 0 ? '#c084fc' : '#94a3b8'} />
-            <span style={{ fontSize: '11px', fontWeight: 600 }}>
-              {connectedRelays > 0 ? `${connectedRelays} Relays` : 'Relays Off'}
-            </span>
+            <span style={{ fontSize: '11px', fontWeight: 600 }}>{hasConfiguredPin ? 'Locked' : 'Set PIN'}</span>
           </button>
 
           {/* Judge Pitch Deck Button */}
           <button
             className="ctrl-btn"
-            style={{ borderColor: 'var(--btc-orange)', color: 'var(--btc-orange)' }}
+            style={{ borderColor: 'var(--btc-orange)', color: 'var(--btc-orange)', fontWeight: 700 }}
             onClick={() => {
               setShowPitchModal(true);
               soundController.playClick();
             }}
           >
             <Award size={15} />
-            Pitch & Arch
+            Pitch Deck
           </button>
         </div>
       </header>
 
-      {/* Network Alert Banner */}
-      <div className={`network-banner ${isOffline ? 'offline-alert' : 'online-alert'}`}>
-        <div>
-          <strong>{isOffline ? '⚡ Network Interrupted: ' : '🟢 Network Active: '}</strong>
-          {isOffline
-            ? 'Cashu Ecash enables zero-data offline payments! You can still receive & pay satoshis locally.'
-            : 'Lightning Network and Mint connected. Real-time swap and settlement active.'}
+      {/* Hackathon Judge Interactive Spotlight Hub */}
+      <div className="hackathon-judge-banner">
+        <div className="banner-text">
+          <span className="badge">🏆 Hackathon Evaluation Hub</span>
+          <span>
+            {lang === 'ha'
+              ? 'Gwada duk fasalolin BitFriend: biyan kudi ba tare da intanet ba, BitChat, tara kudin Adashi, da cirewa zuwa OPay/PalmPay.'
+              : 'Evaluate all BitFriend modules: zero-data offline ecash, encrypted Nostr BitChat, communal Adashi, and instant bank off-ramp.'}
+          </span>
         </div>
-        <button onClick={() => setIsOffline(!isOffline)}>
-          {isOffline ? 'Restore Network' : 'Simulate Offline Outage'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            className="btn-secondary"
+            style={{ padding: '5px 12px', fontSize: '11px', borderColor: isOffline ? '#c084fc' : '#10b981', color: isOffline ? '#c084fc' : '#10b981' }}
+            onClick={() => {
+              setIsOffline(!isOffline);
+              soundController.playClick();
+            }}
+          >
+            {isOffline ? <Wifi size={13} style={{ display: 'inline', marginRight: '4px' }} /> : <WifiOff size={13} style={{ display: 'inline', marginRight: '4px' }} />}
+            {isOffline ? 'Restore Network' : 'Simulate 100% Outage'}
+          </button>
+          <button
+            className="btn-secondary"
+            style={{ padding: '5px 12px', fontSize: '11px', borderColor: 'var(--btc-orange)', color: 'var(--btc-orange)' }}
+            onClick={() => {
+              setShowPitchModal(true);
+              soundController.playClick();
+            }}
+          >
+            <Award size={13} style={{ display: 'inline', marginRight: '4px' }} />
+            Architecture Deck
+          </button>
+          <button
+            className="btn-secondary"
+            style={{ padding: '5px 12px', fontSize: '11px' }}
+            onClick={() => {
+              setActiveTab('lab');
+              soundController.playClick();
+            }}
+          >
+            <Sliders size={13} style={{ display: 'inline', marginRight: '4px' }} />
+            Stress Test Lab
+          </button>
+        </div>
       </div>
 
       {/* Total Balance Card */}
@@ -985,30 +1012,63 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick Action: Cash Out to Bank / Mobile Money */}
-        <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button
-            className="btn-primary"
-            style={{
-              padding: '8px 14px',
-              fontSize: '12px',
-              fontWeight: 600,
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              border: 'none',
-              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              width: 'auto'
-            }}
+        {/* Quick Action Super-App Command Grid */}
+        <div className="quick-action-grid">
+          <div
+            className={`quick-action-card bank-action ${activeTab === 'bank' ? 'active' : ''}`}
             onClick={() => {
-              setShowWithdrawModal(true);
+              setActiveTab('bank');
               soundController.playClick();
             }}
           >
-            <Building2 size={15} />
-            Cash Out to Bank (OPay / PalmPay / M-Pesa)
-          </button>
+            <div className="icon-wrap" style={{ background: 'rgba(16, 185, 129, 0.15)' }}>
+              <Building2 size={18} color="#10b981" />
+            </div>
+            <span>Cash Out to Bank</span>
+            <span style={{ fontSize: '10px', color: '#10b981' }}>OPay / PalmPay / M-Pesa</span>
+          </div>
+
+          <div
+            className={`quick-action-card ${activeTab === 'pos' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('pos');
+              soundController.playClick();
+            }}
+          >
+            <div className="icon-wrap" style={{ background: 'rgba(247, 147, 26, 0.15)' }}>
+              <Store size={18} color="var(--btc-orange)" />
+            </div>
+            <span>Merchant POS</span>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Offline QR & NFC</span>
+          </div>
+
+          <div
+            className={`quick-action-card ${activeTab === 'bitchat' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('bitchat');
+              soundController.playClick();
+            }}
+          >
+            <div className="icon-wrap" style={{ background: 'rgba(168, 85, 247, 0.15)' }}>
+              <MessageSquare size={18} color="#c084fc" />
+            </div>
+            <span>BitChat P2P</span>
+            <span style={{ fontSize: '10px', color: '#c084fc' }}>Encrypted Nostr Sats</span>
+          </div>
+
+          <div
+            className={`quick-action-card ${activeTab === 'adashi' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('adashi');
+              soundController.playClick();
+            }}
+          >
+            <div className="icon-wrap" style={{ background: 'rgba(56, 189, 248, 0.15)' }}>
+              <Users size={18} color="#38bdf8" />
+            </div>
+            <span>Adashi Circles</span>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Community Pot</span>
+          </div>
         </div>
       </div>
 
@@ -1037,14 +1097,15 @@ export const App: React.FC = () => {
         </button>
 
         <button
-          className={`tab-btn ${activeTab === 'vault' ? 'active' : ''}`}
+          className={`tab-btn ${activeTab === 'bank' ? 'active' : ''}`}
+          style={{ borderColor: activeTab === 'bank' ? '#10b981' : undefined, color: activeTab === 'bank' ? '#10b981' : undefined }}
           onClick={() => {
-            setActiveTab('vault');
+            setActiveTab('bank');
             soundController.playClick();
           }}
         >
-          <ShieldCheck size={18} />
-          {t.vaultTab} ({proofs.length} notes)
+          <Building2 size={18} color="#10b981" />
+          Bank Cash Out (OPay)
         </button>
 
         <button
@@ -1059,6 +1120,17 @@ export const App: React.FC = () => {
         </button>
 
         <button
+          className={`tab-btn ${activeTab === 'vault' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('vault');
+            soundController.playClick();
+          }}
+        >
+          <ShieldCheck size={18} />
+          {t.vaultTab} ({proofs.length} notes)
+        </button>
+
+        <button
           className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`}
           onClick={() => {
             setActiveTab('history');
@@ -1067,6 +1139,17 @@ export const App: React.FC = () => {
         >
           <Clock size={18} />
           {t.historyTab} ({transactions.length})
+        </button>
+
+        <button
+          className={`tab-btn ${activeTab === 'lab' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('lab');
+            soundController.playClick();
+          }}
+        >
+          <Sliders size={18} />
+          Stress Lab & Outages
         </button>
       </nav>
 
@@ -1103,7 +1186,33 @@ export const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Quick Presets */}
+              {/* Market Inventory Presets */}
+              <div>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
+                  {lang === 'ha' ? 'Kayan Kasuwa (Zaɓi Kai Tsaye)' : 'Market Catalogue (Quick Inventory)'}
+                </label>
+                <div className="merchant-catalog-grid">
+                  {SAMPLE_PRODUCTS.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="merchant-item-btn"
+                      onClick={() => {
+                        setChargeNgn(p.priceNgn.toString());
+                        setCustomerNote(lang === 'ha' ? p.nameHa : p.name);
+                        setPosSuccessData(null);
+                        soundController.playClick();
+                      }}
+                    >
+                      <span className="item-name">{lang === 'ha' ? p.nameHa : p.name}</span>
+                      <span className="item-fiat">₦{p.priceNgn.toLocaleString()}</span>
+                      <span className="item-sats">{ngnToSats(p.priceNgn).toLocaleString()} sats</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick Cash Presets */}
               <div>
                 <label style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
                   {t.quickPresets}
@@ -1263,7 +1372,8 @@ export const App: React.FC = () => {
                   <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
                     {t.scanToPayPrompt}
                   </div>
-                  <div className="qr-canvas-holder">
+                  <div className="qr-terminal-box">
+                    <div className="qr-laser-line"></div>
                     <QRCodeSVG
                       value={`cashu:${encodeCashuToken(
                         [generateProof(posSats || 100, activeMintUrl)],
@@ -1275,8 +1385,39 @@ export const App: React.FC = () => {
                       includeMargin={false}
                     />
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    Compatible with Cashu Minibits, eNuts, Nutstash & Lightning wallets
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button
+                      className="btn-secondary"
+                      style={{ padding: '4px 10px', fontSize: '11px', gap: '4px' }}
+                      onClick={() => {
+                        const tokenStr = encodeCashuToken(
+                          [generateProof(posSats || 100, activeMintUrl)],
+                          activeMintUrl,
+                          customerNote
+                        );
+                        navigator.clipboard.writeText(`cashu:${tokenStr}`);
+                        soundController.playClick();
+                        alert('Cashu payment token copied to clipboard!');
+                      }}
+                    >
+                      <Copy size={12} />
+                      Copy Cashu Token
+                    </button>
+                    <button
+                      className="btn-secondary"
+                      style={{ padding: '4px 10px', fontSize: '11px', gap: '4px' }}
+                      onClick={() => {
+                        soundController.playPaymentChime();
+                        soundController.speakReceipt(posSats || 100, lang);
+                      }}
+                      title="Audio announcement in chosen language"
+                    >
+                      <Volume2 size={12} />
+                      Voice Alert Test
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                    Compatible with Cashu Minibits, eNuts, Nutstash, Phoenix, Zeus & Blink wallets
                   </div>
                 </>
               )}
@@ -1755,6 +1896,37 @@ export const App: React.FC = () => {
             ))}
           </div>
         </div>
+      )}
+
+      {/* TAB 5: BANK CASH OUT (AFRICAN FIAT GATEWAY) */}
+      {activeTab === 'bank' && (
+        <WithdrawToBankModal
+          isInline={true}
+          vaultProofs={proofs}
+          onVaultProofsChanged={updated => {
+            setProofs(updated);
+            saveStoredProofs(updated);
+            saveSecureProofs(updated).catch(console.warn);
+          }}
+          onTransactionRecorded={tx => {
+            setTransactions(prev => [tx, ...prev]);
+            saveSecureTransactions([tx, ...transactions]).catch(console.warn);
+          }}
+          lang={lang}
+        />
+      )}
+
+      {/* TAB 6: JUDGE STRESS LAB & OFFLINE OUTAGES */}
+      {activeTab === 'lab' && (
+        <MarketSimulationLab
+          isInline={true}
+          onNetworkChange={(offline: boolean) => setIsOffline(offline)}
+          isCurrentlyOffline={isOffline}
+          activeProofs={proofs}
+          onTriggerAdashiStep={() => {
+            handleContributeAdashi('circle-1');
+          }}
+        />
       )}
 
       {/* MODAL: QR SCANNER (CAMERA & FILE) */}

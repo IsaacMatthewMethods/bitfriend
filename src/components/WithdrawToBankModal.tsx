@@ -15,12 +15,13 @@ import { satsToNgn, ngnToSats, spendProofs } from '../utils/cashuEngine';
 import { soundController } from '../utils/audioVoice';
 
 interface WithdrawToBankModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   vaultProofs: CashuProof[];
   onVaultProofsChanged: (updated: CashuProof[]) => void;
   onTransactionRecorded: (tx: PaymentTransaction) => void;
   lang: Language;
+  isInline?: boolean;
 }
 
 interface BankOption {
@@ -43,12 +44,13 @@ const SUPPORTED_BANKS: BankOption[] = [
 ];
 
 export const WithdrawToBankModal: React.FC<WithdrawToBankModalProps> = ({
-  isOpen,
-  onClose,
+  isOpen = false,
+  onClose = () => {},
   vaultProofs,
   onVaultProofsChanged,
   onTransactionRecorded,
   lang,
+  isInline = false,
 }) => {
   const [selectedBank, setSelectedBank] = useState<string>('opay');
   const [accountNumber, setAccountNumber] = useState<string>('7031234567');
@@ -71,7 +73,7 @@ export const WithdrawToBankModal: React.FC<WithdrawToBankModalProps> = ({
     timestamp: number;
   } | null>(null);
 
-  if (!isOpen) return null;
+  if (!isInline && !isOpen) return null;
 
   const totalVaultSats = vaultProofs.reduce((sum, p) => sum + p.amount, 0);
 
@@ -206,54 +208,40 @@ export const WithdrawToBankModal: React.FC<WithdrawToBankModalProps> = ({
     }
   };
 
-  return (
-    <div className="modal-backdrop" onClick={settlementStep !== 'processing' ? onClose : undefined}>
-      <div
-        className="modal-content"
-        style={{
-          maxWidth: '460px',
-          width: '92%',
-          background: 'linear-gradient(145deg, #161c28, #0e121a)',
-          border: '1px solid rgba(16, 185, 129, 0.4)',
-          borderRadius: '24px',
-          padding: '24px',
-          boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(16, 185, 129, 0.15)',
-          color: '#f8fafc',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div
-              style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-              }}
-            >
-              <Building2 size={20} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0 }}>
-                {lang === 'ha' ? 'Cire Kuɗi zuwa Asosun Banki' : 'Withdraw Satoshis to Bank'}
-              </h3>
-              <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                Instant African Lightning Fiat Off-Ramp Gateway
-              </div>
+  const innerContent = (
+    <>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div
+            style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+            }}
+          >
+            <Building2 size={20} />
+          </div>
+          <div>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0 }}>
+              {lang === 'ha' ? 'Cire Kuɗi zuwa Asosun Banki' : 'Withdraw Satoshis to Bank'}
+            </h3>
+            <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+              Instant African Lightning Fiat Off-Ramp Gateway
             </div>
           </div>
-          {settlementStep !== 'processing' && (
-            <button className="modal-close-btn" onClick={onClose}>
-              <X size={20} />
-            </button>
-          )}
         </div>
+        {!isInline && settlementStep !== 'processing' && (
+          <button className="modal-close-btn" onClick={onClose}>
+            <X size={20} />
+          </button>
+        )}
+      </div>
 
         {settlementStep === 'input' && (
           <div>
@@ -548,14 +536,54 @@ export const WithdrawToBankModal: React.FC<WithdrawToBankModalProps> = ({
               <button
                 type="button"
                 className="btn-primary"
-                onClick={onClose}
+                onClick={isInline ? () => setSettlementStep('input') : onClose}
                 style={{ flex: 1, padding: '10px' }}
               >
-                Done
+                {isInline ? 'New Cash Out' : 'Done'}
               </button>
             </div>
           </div>
         )}
+    </>
+  );
+
+  if (isInline) {
+    return (
+      <div
+        className="card"
+        style={{
+          maxWidth: '560px',
+          margin: '0 auto',
+          background: 'linear-gradient(145deg, #161c28, #0e121a)',
+          border: '1px solid rgba(16, 185, 129, 0.4)',
+          borderRadius: '24px',
+          padding: '24px',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(16, 185, 129, 0.15)',
+          color: '#f8fafc',
+        }}
+      >
+        {innerContent}
+      </div>
+    );
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={settlementStep !== 'processing' ? onClose : undefined}>
+      <div
+        className="modal-content"
+        style={{
+          maxWidth: '460px',
+          width: '92%',
+          background: 'linear-gradient(145deg, #161c28, #0e121a)',
+          border: '1px solid rgba(16, 185, 129, 0.4)',
+          borderRadius: '24px',
+          padding: '24px',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(16, 185, 129, 0.15)',
+          color: '#f8fafc',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {innerContent}
       </div>
     </div>
   );

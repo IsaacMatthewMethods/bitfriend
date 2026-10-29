@@ -833,3 +833,214 @@
   }
 }
 
+/* ==========================================================================
+   Fintech Super-App Header Ticker & Navigation Grid
+   ========================================================================== */
+.superapp-ticker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-full);
+  padding: 6px 16px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow-x: auto;
+  gap: 16px;
+}
+
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.ticker-item strong {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse 2s infinite;
+}
+
+/* Quick Action Grid inside Hero Card */
+.quick-action-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 18px;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .quick-action-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.quick-action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.quick-action-card:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--border-focus);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.quick-action-card.active {
+  background: linear-gradient(135deg, rgba(247, 147, 26, 0.2), rgba(247, 147, 26, 0.05));
+  border-color: var(--btc-orange);
+  color: var(--btc-orange);
+}
+
+.quick-action-card.bank-action {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.03));
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.quick-action-card.bank-action:hover {
+  border-color: #10b981;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
+}
+
+.quick-action-card .icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+/* Merchant POS Inventory Catalogue Grid */
+.merchant-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.merchant-item-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.merchant-item-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--btc-orange);
+  transform: translateY(-1px);
+}
+
+.merchant-item-btn .item-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.merchant-item-btn .item-fiat {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--btc-orange);
+  font-family: var(--font-mono);
+}
+
+.merchant-item-btn .item-sats {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* QR Code Terminal Laser Scanner */
+.qr-terminal-box {
+  position: relative;
+  background: white;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  display: inline-block;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.qr-laser-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #F7931A, #10B981, transparent);
+  box-shadow: 0 0 12px #F7931A;
+  animation: qrLaser 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes qrLaser {
+  0% { top: 4%; opacity: 0.9; }
+  50% { top: 92%; opacity: 1; }
+  100% { top: 4%; opacity: 0.9; }
+}
+
+/* Feature Spotlight Bar */
+.hackathon-judge-banner {
+  background: linear-gradient(90deg, rgba(247, 147, 26, 0.12) 0%, rgba(139, 92, 246, 0.12) 50%, rgba(16, 185, 129, 0.12) 100%);
+  border: 1px solid rgba(247, 147, 26, 0.35);
+  border-radius: var(--radius-md);
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.hackathon-judge-banner .banner-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hackathon-judge-banner .badge {
+  background: var(--btc-orange);
+  color: #000;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+

@@ -14,28 +14,30 @@ import { verifyProofCurveSignature } from '../utils/cryptoCashu';
 import type { CashuProof } from '../types';
 
 interface MarketSimulationLabProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   onNetworkChange: (offline: boolean) => void;
   isCurrentlyOffline: boolean;
   activeProofs: CashuProof[];
   onTriggerAdashiStep: () => void;
+  isInline?: boolean;
 }
 
 export const MarketSimulationLab: React.FC<MarketSimulationLabProps> = ({
-  isOpen,
-  onClose,
+  isOpen = false,
+  onClose = () => {},
   onNetworkChange,
   isCurrentlyOffline,
   activeProofs,
   onTriggerAdashiStep,
+  isInline = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'inflation' | 'network' | 'crypto' | 'adashi'>('inflation');
   const [simRound, setSimRound] = useState<number>(1);
   const [isAutoSimulating, setIsAutoSimulating] = useState<boolean>(false);
   const [simLog, setSimLog] = useState<string[]>([]);
 
-  if (!isOpen) return null;
+  if (!isInline && !isOpen) return null;
 
   // Inflation timeline data: ₦100,000 saved over 12 months vs Satoshis
   const inflationData = [
@@ -88,22 +90,19 @@ export const MarketSimulationLab: React.FC<MarketSimulationLabProps> = ({
     }, 1200);
   };
 
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal-content"
-        style={{ maxWidth: '640px', width: '94%' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sliders size={20} color="var(--btc-orange)" />
-            <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Market Simulation Lab & Inflation Engine</h3>
-          </div>
+  const innerContent = (
+    <>
+      <div className="modal-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Sliders size={20} color="var(--btc-orange)" />
+          <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Market Simulation Lab & Inflation Engine</h3>
+        </div>
+        {!isInline && (
           <button className="modal-close-btn" onClick={onClose}>
             <X size={18} />
           </button>
-        </div>
+        )}
+      </div>
 
         {/* Tab selection */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', overflowX: 'auto', paddingBottom: '4px' }}>
@@ -383,6 +382,37 @@ export const MarketSimulationLab: React.FC<MarketSimulationLabProps> = ({
             </div>
           </div>
         )}
+    </>
+  );
+
+  if (isInline) {
+    return (
+      <div
+        className="card"
+        style={{
+          maxWidth: '780px',
+          margin: '0 auto',
+          background: 'linear-gradient(145deg, #161c28, #0e121a)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: '24px',
+          padding: '24px',
+          boxShadow: 'var(--shadow-md)',
+          color: '#f8fafc',
+        }}
+      >
+        {innerContent}
+      </div>
+    );
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal-content"
+        style={{ maxWidth: '640px', width: '94%' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {innerContent}
       </div>
     </div>
   );
