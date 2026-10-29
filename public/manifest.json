@@ -1,0 +1,18 @@
+{
+  "short_name": "BitFriend",
+  "name": "BitFriend (BitAboki) - Offline Bitcoin & Ecash",
+  "description": "Offline-First Chaumian Ecash & Lightning PWA for Grassroots Commerce in Africa",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#090D16",
+  "theme_color": "#090D16",
+  "display": "standalone",
+  "orientation": "portrait",
+  "categories": ["finance", "business", "utilities"]
+}
