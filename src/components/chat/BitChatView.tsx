@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  MessageSquare,
   Search,
   UserPlus,
   Zap,
@@ -14,6 +13,7 @@ import {
   saveSecureContacts,
   getOfflineMessageQueue
 } from '../../utils/secureStorage';
+import { ApiClient } from '../../services/apiClient';
 import { soundController } from '../../utils/audioVoice';
 
 interface BitChatViewProps {
@@ -34,6 +34,9 @@ export const BitChatView: React.FC<BitChatViewProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [offlineQueuedCount, setOfflineQueuedCount] = useState<number>(0);
   const [showAddContactModal, setShowAddContactModal] = useState<boolean>(false);
+  const [isMobileView, setIsMobileView] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
 
   // New Contact form state
   const [newName, setNewName] = useState<string>('');
@@ -42,14 +45,32 @@ export const BitChatView: React.FC<BitChatViewProps> = ({
 
   useEffect(() => {
     let mounted = true;
-    getSecureContacts().then(c => {
+    const onResize = () => setIsMobileView(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+
+    // Load contacts from SQLite backend first, fallback to IndexedDB
+    (async () => {
+      try {
+        const remoteContacts = await ApiClient.getChatContacts();
+        if (mounted && Array.isArray(remoteContacts) && remoteContacts.length > 0) {
+          setContacts(remoteContacts);
+          saveSecureContacts(remoteContacts).catch(() => {});
+          if (!selectedContact && window.innerWidth >= 768) {
+            setSelectedContact(remoteContacts[0]);
+          }
+          return;
+        }
+      } catch {
+        // Offline fallback
+      }
+      const localContacts = await getSecureContacts();
       if (mounted) {
-        setContacts(c);
-        if (c.length > 0 && !selectedContact && window.innerWidth >= 768) {
-          setSelectedContact(c[0]);
+        setContacts(localContacts);
+        if (localContacts.length > 0 && !selectedContact && window.innerWidth >= 768) {
+          setSelectedContact(localContacts[0]);
         }
       }
-    });
+    })();
 
     getOfflineMessageQueue().then(queue => {
       if (mounted) setOfflineQueuedCount(queue.length);
@@ -57,6 +78,7 @@ export const BitChatView: React.FC<BitChatViewProps> = ({
 
     return () => {
       mounted = false;
+      window.removeEventListener('resize', onResize);
     };
   }, []);
 
@@ -106,6 +128,22 @@ export const BitChatView: React.FC<BitChatViewProps> = ({
     saveSecureContacts(updated);
     setSelectedContact(newContact);
 
+    // Persist new contact to SQLite backend
+    ApiClient.addChatContact({
+      name: newName.trim(),
+      handle: newHandle.trim(),
+      role: newRole.trim() || 'Merchant Associate',
+    })
+      .then((savedRemote) => {
+        if (savedRemote && savedRemote.id) {
+          setContacts((prev) =>
+            prev.map((item) => (item.id === newContact.id ? savedRemote : item))
+          );
+          setSelectedContact((curr) => (curr?.id === newContact.id ? savedRemote : curr));
+        }
+      })
+      .catch(() => {});
+
     setNewName('');
     setNewHandle('');
     setNewRole('');
@@ -122,75 +160,25 @@ export const BitChatView: React.FC<BitChatViewProps> = ({
   });
 
   return (
-    <div className="card" style={{ padding: '16px', background: 'var(--bg-secondary, #111827)' }}>
-      {/* Title Bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '16px',
-          flexWrap: 'wrap',
-          gap: '10px',
-        }}
-      >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-              }}
-            >
-              <MessageSquare size={18} />
-            </div>
-            <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>
-              BitChat: Social Bitcoin Messenger
-            </h2>
-          </div>
-          <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0 0' }}>
-            WhatsApp-style end-to-end encrypted chats with instant inline Cashu bearer token zaps.
-          </p>
+    <div className="bitchat-native-shell">
+      {/* Offline queue indicator (only shown when messages are queued) */}
+      {offlineQueuedCount > 0 && (
+        <div className="bitchat-queue-banner mb-2">
+          <Clock size={14} />
+          <span>{offlineQueuedCount} messages queued for relay sync</span>
         </div>
-
-        {/* Offline queue warning */}
-        {offlineQueuedCount > 0 && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '20px',
-              background: 'rgba(245, 158, 11, 0.15)',
-              border: '1px solid rgba(245, 158, 11, 0.3)',
-              color: '#fbbf24',
-              fontSize: '12px',
-              fontWeight: 600,
-            }}
-          >
-            <Clock size={14} />
-            <span>{offlineQueuedCount} messages queued offline</span>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Main Grid: Roster + Chat */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: selectedContact ? 'minmax(280px, 340px) 1fr' : '1fr',
+          gridTemplateColumns: !isMobileView ? 'minmax(280px, 340px) 1fr' : '1fr',
           gap: '16px',
         }}
       >
         {/* Left Column: Contact Roster */}
-        {(!selectedContact || window.innerWidth >= 768) && (
+        {(!selectedContact || !isMobileView) && (
           <div
             style={{
               background: '#0d1117',
@@ -199,7 +187,8 @@ export const BitChatView: React.FC<BitChatViewProps> = ({
               padding: '14px',
               display: 'flex',
               flexDirection: 'column',
-              height: '650px',
+              height: isMobileView ? 'calc(100vh - 260px)' : '620px',
+              minHeight: '420px',
             }}
           >
             {/* Search bar & Add Button */}
@@ -376,7 +365,7 @@ export const BitChatView: React.FC<BitChatViewProps> = ({
             onVaultProofsChanged={onVaultProofsChanged}
             isOffline={isOffline}
           />
-        ) : (
+        ) : !isMobileView ? (
           <div
             style={{
               background: '#0d1117',
@@ -387,7 +376,7 @@ export const BitChatView: React.FC<BitChatViewProps> = ({
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              height: '650px',
+              height: '620px',
               textAlign: 'center',
             }}
           >
@@ -412,7 +401,7 @@ export const BitChatView: React.FC<BitChatViewProps> = ({
               Text fellow African merchants, send inline satoshis, or exchange Cashu vouchers with 0 data routing fees.
             </p>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* MODAL: ADD CONTACT */}

@@ -20,7 +20,8 @@ import {
   getSecureMessages,
   saveSecureMessage
 } from '../../utils/secureStorage';
-import { sendNip44ChatMessage, getCurrentNostrIdentity } from '../../utils/nostrClient';
+import { sendNip44ChatMessage } from '../../utils/nostrClient';
+import { ApiClient } from '../../services/apiClient';
 
 interface ChatConversationProps {
   contact: ChatContact;
@@ -53,15 +54,93 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
 
   useEffect(() => {
     let mounted = true;
-    getSecureMessages(contact.id).then(msgs => {
-      if (mounted) {
-        setMessages(msgs);
+    let ws: WebSocket | null = null;
+
+    (async () => {
+      try {
+        const remoteMsgs = await ApiClient.getChatMessages(contact.id);
+        if (mounted && Array.isArray(remoteMsgs) && remoteMsgs.length > 0) {
+          setMessages(remoteMsgs);
+          return;
+        }
+      } catch {
+        // Offline fallback
       }
-    });
+      const localMsgs = await getSecureMessages(contact.id);
+      if (mounted) {
+        setMessages(localMsgs);
+      }
+    })();
+
+    // Connect to live WebSocket relay for real-time P2P chat & voucher updates
+    try {
+      ws = new WebSocket(ApiClient.getWebSocketUrl());
+      ws.onopen = () => {
+        ws?.send(JSON.stringify({ type: 'subscribe', channel: 'chat:messages' }));
+      };
+      ws.onmessage = (event) => {
+        if (!mounted) return;
+        try {
+          const packet = JSON.parse(event.data);
+          if (packet.event === 'chat_message' && packet.data) {
+            const d = packet.data;
+            const peerKey = (contact.nostrNpub || contact.id).toLowerCase();
+            if (
+              d.senderPubkey?.toLowerCase() === peerKey ||
+              d.recipientPubkey?.toLowerCase() === peerKey
+            ) {
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === d.id)) return prev;
+                const incoming: ChatMessage = {
+                  id: d.id,
+                  conversationId: contact.id,
+                  senderId: d.senderPubkey?.toLowerCase() === peerKey ? contact.id : 'me',
+                  senderName: d.senderPubkey?.toLowerCase() === peerKey ? contact.name : 'You',
+                  text: d.text,
+                  timestamp: d.createdAt || Date.now(),
+                  status: 'delivered',
+                  payment: d.cashuToken
+                    ? {
+                        tokenString: d.cashuToken,
+                        amountSats: d.cashuAmountSats || 0,
+                        amountNgn: Math.round((d.cashuAmountSats || 0) * 1.585),
+                        memo: d.text,
+                        status: d.isClaimed ? 'claimed' : 'pending',
+                        mintUrl: 'https://mint.bitfriend.me',
+                      }
+                    : undefined,
+                };
+                return [...prev, incoming];
+              });
+            }
+          } else if (packet.event === 'voucher_claimed' && packet.data?.messageId) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === packet.data.messageId && m.payment
+                  ? { ...m, payment: { ...m.payment, status: 'claimed' } }
+                  : m
+              )
+            );
+          }
+        } catch {
+          // ignore malformed WS frames
+        }
+      };
+    } catch {
+      // Offline mode
+    }
+
     return () => {
       mounted = false;
+      if (ws) {
+        try {
+          ws.close();
+        } catch {
+          // ignore
+        }
+      }
     };
-  }, [contact.id]);
+  }, [contact.id, contact.nostrNpub, contact.name]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -86,9 +165,14 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
     setInputText('');
     await saveSecureMessage(newMsg);
 
-    // Broadcast over Nostr P2P relays if online
+    // Persist to SQLite backend & broadcast over WebSocket + Nostr P2P relays if online
     if (!isOffline) {
-      const recipientPubkey = contact.nostrNpub || getCurrentNostrIdentity().pubkey;
+      const recipientPubkey = contact.nostrNpub || contact.id;
+      ApiClient.sendChatMessage({
+        id: newMsg.id,
+        recipientPubkey,
+        text,
+      }).catch(() => {});
       sendNip44ChatMessage(recipientPubkey, newMsg).catch(console.warn);
     }
 
@@ -136,9 +220,16 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
     setMessages(prev => [...prev, paymentMsg]);
     await saveSecureMessage(paymentMsg);
 
-    // Broadcast payment voucher over Nostr relays
+    // Persist payment voucher to SQLite & broadcast over WebSocket + Nostr relays
     if (!isOffline) {
-      const recipientPubkey = contact.nostrNpub || getCurrentNostrIdentity().pubkey;
+      const recipientPubkey = contact.nostrNpub || contact.id;
+      ApiClient.sendChatMessage({
+        id: paymentMsg.id,
+        recipientPubkey,
+        text: paymentMsg.text || `Sent ${payload.amountSats} sats via Cashu Ecash`,
+        cashuToken: payload.tokenString,
+        cashuAmountSats: payload.amountSats,
+      }).catch(() => {});
       sendNip44ChatMessage(recipientPubkey, paymentMsg).catch(console.warn);
     }
   };
@@ -442,6 +533,7 @@ export const ChatConversation: React.FC<ChatConversationProps> = ({
                     payment={msg.payment}
                     isSender={isMe}
                     onPaymentClaimed={amt => {
+                      ApiClient.markChatVoucherClaimed(msg.id).catch(() => {});
                       if (onPaymentClaimedNotify) {
                         onPaymentClaimedNotify(amt);
                       }

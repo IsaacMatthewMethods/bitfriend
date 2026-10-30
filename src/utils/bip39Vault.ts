@@ -1,6 +1,10 @@
-// BIP-39 Deterministic 12-Word Mnemonic Vault Backup & Restore Engine
+// BIP-39 Deterministic 12-Word Mnemonic Vault, NUT-13 Key Derivation & Schnorr Signing Engine
+import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js';
+import { sha256, sha512 } from '@noble/hashes/sha2.js';
+import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 
-const BIP39_SAMPLE_WORDS = [
+const BIP39_WORDLIST_SUBSET = [
   'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'abuse',
   'access', 'accident', 'account', 'accuse', 'achieve', 'acid', 'acoustic', 'acquire', 'across', 'act',
   'action', 'actor', 'actress', 'actual', 'adapt', 'add', 'addict', 'address', 'adjust', 'admit',
@@ -207,10 +211,19 @@ const BIP39_SAMPLE_WORDS = [
   'wrong', 'yard', 'year', 'yellow', 'you', 'young', 'youth', 'zebra', 'zero', 'zone', 'zoo'
 ];
 
+export interface SovereignWalletIdentity {
+  privkeyHex: string;
+  pubkeyCompressedHex: string; // 33-byte (66 hex chars: 02/03 + X)
+  pubkeyXOnlyHex: string;      // 32-byte (64 hex chars: BIP-340 Schnorr X)
+}
+
+/**
+ * Generates a cryptographically random 12-word mnemonic phrase.
+ */
 export function generate12WordMnemonic(): string[] {
   const words: string[] = [];
   const randomBytes = new Uint32Array(12);
-  
+
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
     crypto.getRandomValues(randomBytes);
   } else {
@@ -220,28 +233,114 @@ export function generate12WordMnemonic(): string[] {
   }
 
   for (let i = 0; i < 12; i++) {
-    const idx = randomBytes[i] % BIP39_SAMPLE_WORDS.length;
-    words.push(BIP39_SAMPLE_WORDS[idx]);
+    const idx = randomBytes[i] % BIP39_WORDLIST_SUBSET.length;
+    words.push(BIP39_WORDLIST_SUBSET[idx]);
   }
 
   return words;
 }
 
+/**
+ * Standard BIP-39 PBKDF2-HMAC-SHA512 512-bit (64-byte) seed derivation.
+ */
+export function deriveSeedFromMnemonic(words: string[], passphrase = ''): Uint8Array {
+  const enc = new TextEncoder();
+  const normalizedMnemonic = words.map((w) => w.trim().toLowerCase()).join(' ');
+  const salt = 'mnemonic' + passphrase;
+  return pbkdf2(sha512, enc.encode(normalizedMnemonic), enc.encode(salt), {
+    c: 2048,
+    dkLen: 64,
+  });
+}
+
+/**
+ * Deterministically derives the user's secp256k1 wallet & Nostr keypair from their 12-word mnemonic.
+ */
+export function deriveWalletIdentityFromMnemonic(words?: string[]): SovereignWalletIdentity {
+  const mnemonic = words && words.length > 0 ? words : getStoredMnemonic();
+  const seed64 = deriveSeedFromMnemonic(mnemonic);
+  // Domain-separated master private key derivation (32 bytes)
+  const privBytes = sha256(seed64);
+  const privkeyHex = bytesToHex(privBytes);
+  const pubkeyCompressedHex = bytesToHex(secp256k1.getPublicKey(privBytes, true));
+  const pubkeyXOnlyHex = bytesToHex(schnorr.getPublicKey(privBytes));
+
+  return {
+    privkeyHex,
+    pubkeyCompressedHex,
+    pubkeyXOnlyHex,
+  };
+}
+
+/**
+ * NUT-13 Deterministic Cashu Secret & Blinding Factor Derivation from BIP-39 Seed.
+ */
+export function deriveNut13SecretAndBlinding(
+  keysetId: string,
+  counter: number,
+  words?: string[]
+): { secretHex: string; rHex: string } {
+  const mnemonic = words && words.length > 0 ? words : getStoredMnemonic();
+  const seed64 = deriveSeedFromMnemonic(mnemonic);
+  const enc = new TextEncoder();
+
+  const secretMaterial = new Uint8Array([
+    ...seed64,
+    ...enc.encode(`cashu:nut13:secret:${keysetId}:${counter}`),
+  ]);
+  const rMaterial = new Uint8Array([
+    ...seed64,
+    ...enc.encode(`cashu:nut13:r:${keysetId}:${counter}`),
+  ]);
+
+  return {
+    secretHex: bytesToHex(sha256(secretMaterial)),
+    rHex: bytesToHex(sha256(rMaterial)),
+  };
+}
+
+/**
+ * Signs a server authentication challenge nonce using BIP-340 Schnorr on secp256k1.
+ */
+export function signAuthChallenge(nonce: string, words?: string[]): {
+  pubkey: string;
+  signatureHex: string;
+} {
+  const identity = deriveWalletIdentityFromMnemonic(words);
+  const msgHash = sha256(new TextEncoder().encode(nonce));
+  const sigBytes = schnorr.sign(msgHash, hexToBytes(identity.privkeyHex));
+  return {
+    pubkey: identity.pubkeyCompressedHex,
+    signatureHex: bytesToHex(sigBytes),
+  };
+}
+
 export function getStoredMnemonic(): string[] {
   try {
-    const raw = localStorage.getItem('bitfriend_vault_mnemonic');
-    if (raw) return JSON.parse(raw);
-    const generated = generate12WordMnemonic();
-    localStorage.setItem('bitfriend_vault_mnemonic', JSON.stringify(generated));
-    return generated;
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('bitfriend_vault_mnemonic');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length === 12) return parsed;
+      }
+      const generated = generate12WordMnemonic();
+      localStorage.setItem('bitfriend_vault_mnemonic', JSON.stringify(generated));
+      return generated;
+    }
   } catch {
-    return generate12WordMnemonic();
+    // Fallback for non-browser / SSR environments
   }
+  return [
+    'abandon', 'ability', 'able', 'about', 'above', 'absent',
+    'absorb', 'abstract', 'absurd', 'abuse', 'access', 'satoshi',
+  ];
 }
 
 export function saveMnemonic(words: string[]): void {
   try {
-    localStorage.setItem('bitfriend_vault_mnemonic', JSON.stringify(words));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('bitfriend_vault_mnemonic', JSON.stringify(words));
+    }
   } catch (err) {
     console.error('Failed to save mnemonic', err);
   }
@@ -249,15 +348,20 @@ export function saveMnemonic(words: string[]): void {
 
 export function isVaultBackedUp(): boolean {
   try {
-    return localStorage.getItem('bitfriend_vault_backed_up') === 'true';
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('bitfriend_vault_backed_up') === 'true';
+    }
   } catch {
-    return false;
+    // ignore
   }
+  return false;
 }
 
 export function markVaultBackedUp(): void {
   try {
-    localStorage.setItem('bitfriend_vault_backed_up', 'true');
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('bitfriend_vault_backed_up', 'true');
+    }
   } catch (err) {
     console.error('Failed to mark backed up', err);
   }

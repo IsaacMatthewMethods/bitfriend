@@ -6,6 +6,11 @@ import {
   Copy,
   Check,
   Radio,
+  QrCode,
+  Delete,
+  CheckCircle2,
+  Grid,
+  Calculator,
 } from 'lucide-react';
 import { useWallet } from '../context/WalletContext';
 import { useMarket } from '../context/MarketContext';
@@ -23,24 +28,26 @@ interface PosProduct {
   nameHa: string;
   priceNgn: number;
   category: string;
+  stockCount?: number;
 }
 
 const INITIAL_CATALOG: PosProduct[] = [
-  { id: 'p1', name: 'Ankara Fabric (6 Yds)', nameHa: 'Atamfa (Yadi 6)', priceNgn: 5000, category: 'Apparel' },
-  { id: 'p2', name: 'Grain & Rice Bag (5kg)', nameHa: 'Buhun Shinkafa (5kg)', priceNgn: 4500, category: 'Food' },
-  { id: 'p3', name: 'Fresh Market Tomatoes', nameHa: 'Tumatir na Kasuwa', priceNgn: 1500, category: 'Food' },
-  { id: 'p4', name: 'Pure Shea Butter Balm', nameHa: 'Man Kadanya', priceNgn: 1000, category: 'Cosmetics' },
-  { id: 'p5', name: 'Spiced Tea & Masa Snack', nameHa: 'Shayi da Masa', priceNgn: 600, category: 'Snacks' },
-  { id: 'p6', name: 'Keke Tricycle Commute', nameHa: 'Kudin Keke Napep', priceNgn: 400, category: 'Transport' },
+  { id: 'p1', name: 'Ankara Fabric (6 Yds)', nameHa: 'Atamfa (Yadi 6)', priceNgn: 5000, category: 'Apparel', stockCount: 80 },
+  { id: 'p2', name: 'Grain & Rice Bag (5kg)', nameHa: 'Buhun Shinkafa (5kg)', priceNgn: 4500, category: 'Food', stockCount: 45 },
+  { id: 'p3', name: 'Fresh Market Tomatoes', nameHa: 'Tumatir na Kasuwa', priceNgn: 1500, category: 'Food', stockCount: 15 },
+  { id: 'p4', name: 'Pure Shea Butter Balm', nameHa: 'Man Kadanya', priceNgn: 1000, category: 'Cosmetics', stockCount: 60 },
+  { id: 'p5', name: 'Spiced Tea & Masa Snack', nameHa: 'Shayi da Masa', priceNgn: 600, category: 'Snacks', stockCount: 120 },
+  { id: 'p6', name: 'Keke Tricycle Commute', nameHa: 'Kudin Keke Napep', priceNgn: 400, category: 'Transport', stockCount: 999 },
 ];
 
 export const PosPage: React.FC = () => {
   const { proofs, updateProofs, addTransaction, isOffline, lang } = useWallet();
   const { ngnToSats } = useMarket();
 
-  // POS State
+  const [mobileTab, setMobileTab] = useState<'keypad' | 'catalog'>('keypad');
   const [chargeNgn, setChargeNgn] = useState<number>(1500);
   const [customerMemo, setCustomerMemo] = useState<string>('');
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<PosProduct[]>(INITIAL_CATALOG);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [activeToken, setActiveToken] = useState<string>('');
@@ -55,7 +62,6 @@ export const PosPage: React.FC = () => {
   const [newItemPrice, setNewItemPrice] = useState<string>('');
   const [newItemCategory, setNewItemCategory] = useState<string>('General');
 
-  // Load catalog from backend SQLite server on mount
   useEffect(() => {
     ApiClient.getPosCatalog()
       .then((items) => {
@@ -66,36 +72,63 @@ export const PosPage: React.FC = () => {
             nameHa: i.name_ha || i.name_en,
             priceNgn: i.price_ngn,
             category: i.category || 'General',
+            stockCount: typeof i.stock_count === 'number' ? i.stock_count : 50,
           }));
           setCatalog(mapped);
         }
       })
-      .catch(() => {
-        // Tolerates offline cleanly
-      });
+      .catch(() => {});
   }, []);
 
   const chargeSats = ngnToSats(chargeNgn);
-
   const categories = ['All', ...Array.from(new Set(catalog.map((c) => c.category)))];
+  const filteredCatalog =
+    selectedCategory === 'All'
+      ? catalog
+      : catalog.filter((c) => c.category === selectedCategory);
 
-  const filteredCatalog = selectedCategory === 'All'
-    ? catalog
-    : catalog.filter((c) => c.category === selectedCategory);
-
-  // Generate / refresh payment QR invoice
   const generateInvoice = (amountNgn: number, memo?: string) => {
     const sats = ngnToSats(amountNgn);
     const mockProof = generateProof(sats);
     const token = encodeCashuToken([mockProof]);
     setActiveToken(token);
-    if (memo) setCustomerMemo(memo);
+    if (memo !== undefined) setCustomerMemo(memo);
   };
 
-  // Simulate payment completion
+  const handleDigitPress = (digit: string) => {
+    soundController.playClick();
+    if (digit === 'C') {
+      setChargeNgn(0);
+      setCustomerMemo('');
+      return;
+    }
+    if (digit === 'BACK') {
+      const next = Math.floor(chargeNgn / 10);
+      setChargeNgn(next);
+      return;
+    }
+    const currentStr = chargeNgn === 0 ? '' : chargeNgn.toString();
+    if (currentStr.length >= 7) return;
+    const nextVal = parseInt(currentStr + digit, 10) || 0;
+    setChargeNgn(nextVal);
+    generateInvoice(nextVal);
+  };
+
   const handlePaymentReceived = () => {
+    if (chargeSats <= 0) return;
     const newProof = generateProof(chargeSats);
     updateProofs([...proofs, newProof]);
+
+    // Deduct stock count locally if a catalog item was selected
+    if (selectedProductId) {
+      setCatalog((prev) =>
+        prev.map((p) =>
+          p.id === selectedProductId
+            ? { ...p, stockCount: Math.max(0, (p.stockCount ?? 50) - 1) }
+            : p
+        )
+      );
+    }
 
     const tx: PaymentTransaction = {
       id: `pos_${Date.now()}`,
@@ -103,26 +136,37 @@ export const PosPage: React.FC = () => {
       amountSats: chargeSats,
       amountNgn: chargeNgn,
       type: 'incoming',
-      memo: customerMemo || `Merchant POS Sale (₦${chargeNgn.toLocaleString()})`,
+      memo: customerMemo || `POS Terminal Sale (₦${chargeNgn.toLocaleString()})`,
       status: 'settled',
       method: 'cashu',
       offline: isOffline,
     };
     addTransaction(tx);
 
-    // Sync to backend SQLite database
-    ApiClient.recordTransaction({
-      direction: 'INCOMING',
-      type: 'POS_SALE',
-      amountSats: chargeSats,
-      amountNgn: chargeNgn,
-      memo: tx.memo,
-      status: 'SETTLED',
-    }).catch(() => {});
+    // Create & settle order on SQLite backend (deducting inventory in merchant_items)
+    ApiClient.createPosOrder({
+      items: [
+        {
+          id: selectedProductId || 'custom_keypad',
+          name: customerMemo || 'POS Terminal Charge',
+          priceNgn: chargeNgn,
+          quantity: 1,
+        },
+      ],
+      totalNgn: chargeNgn,
+      totalSats: chargeSats,
+      paymentMethod: 'CASHU',
+    })
+      .then((order) => {
+        if (order?.orderId) {
+          return ApiClient.settlePosOrder(order.orderId);
+        }
+      })
+      .catch(() => {});
 
     soundController.playPaymentChime();
     soundController.speakReceipt(chargeSats, lang);
-    confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
+    confetti({ particleCount: 55, spread: 70, origin: { y: 0.6 } });
 
     setReceiptTx(tx);
     setActiveToken('');
@@ -143,7 +187,6 @@ export const PosPage: React.FC = () => {
     setNewItemName('');
     setNewItemPrice('');
 
-    // Persist to backend database
     ApiClient.addPosItem({
       nameEn: newProd.name,
       nameHa: newProd.nameHa,
@@ -153,22 +196,41 @@ export const PosPage: React.FC = () => {
   };
 
   const copyQrToken = () => {
-    navigator.clipboard.writeText(activeToken || 'cashuA...');
+    navigator.clipboard.writeText(activeToken || `cashuA_${chargeSats}_sats`);
     setCopiedToken(true);
     setTimeout(() => setCopiedToken(false), 2000);
   };
 
   return (
     <div className="page-container pos-page">
+      {/* Mobile Segmented Switcher: Keypad vs Catalog */}
+      <div className="pos-mobile-tabs">
+        <button
+          type="button"
+          className={`pos-seg-btn ${mobileTab === 'keypad' ? 'active' : ''}`}
+          onClick={() => setMobileTab('keypad')}
+        >
+          <Calculator size={15} />
+          <span>{lang === 'ha' ? 'Madannin Kudi' : 'Charge Keypad'}</span>
+        </button>
+        <button
+          type="button"
+          className={`pos-seg-btn ${mobileTab === 'catalog' ? 'active' : ''}`}
+          onClick={() => setMobileTab('catalog')}
+        >
+          <Grid size={15} />
+          <span>{lang === 'ha' ? 'Kayan Kasuwa' : `Catalog (${catalog.length})`}</span>
+        </button>
+      </div>
+
       <div className="fintech-grid-2col">
-        {/* LEFT COLUMN: MERCHANT INVENTORY & QUICK SELECT */}
-        <div className="grid-col-primary">
+        {/* LEFT COLUMN (Desktop) / TAB 2 (Mobile): INVENTORY CATALOG */}
+        <div className={`grid-col-primary ${mobileTab === 'keypad' ? 'hide-on-mobile' : ''}`}>
           <div className="card">
             <div className="card-header-between">
-              <div>
-                <h2>Merchant POS Inventory Catalog</h2>
-                <p className="card-subtitle">Tap any item to instantly calculate live satoshis and charge customer.</p>
-              </div>
+              <h3 className="section-heading-clean">
+                {lang === 'ha' ? 'Jerin Kaya' : 'Product Catalog'}
+              </h3>
 
               <button
                 type="button"
@@ -176,11 +238,10 @@ export const PosPage: React.FC = () => {
                 onClick={() => setShowAddItemModal(true)}
               >
                 <Plus size={14} />
-                <span>Add Item</span>
+                <span>New Item</span>
               </button>
             </div>
 
-            {/* Category Filter Tabs */}
             <div className="category-pill-row">
               {categories.map((cat) => (
                 <button
@@ -194,53 +255,66 @@ export const PosPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Product Cards Grid */}
             <div className="pos-products-grid">
               {filteredCatalog.map((prod) => (
                 <div
                   key={prod.id}
-                  className={`pos-product-item ${chargeNgn === prod.priceNgn ? 'selected' : ''}`}
+                  className={`pos-product-item ${chargeNgn === prod.priceNgn && customerMemo === prod.name ? 'selected' : ''}`}
                   onClick={() => {
+                    soundController.playClick();
+                    setSelectedProductId(prod.id);
                     setChargeNgn(prod.priceNgn);
                     setCustomerMemo(prod.name);
                     generateInvoice(prod.priceNgn, prod.name);
+                    setMobileTab('keypad');
                   }}
                 >
+                  <div className="prod-top-row">
+                    <span className="prod-category-tag">{prod.category}</span>
+                    <span className="prod-price-sats mono-num">
+                      {prod.stockCount !== undefined ? `${prod.stockCount} left • ` : ''}
+                      {ngnToSats(prod.priceNgn).toLocaleString()} sats
+                    </span>
+                  </div>
                   <div className="prod-name">{lang === 'ha' ? prod.nameHa : prod.name}</div>
                   <div className="prod-price-ngn mono-num">₦{prod.priceNgn.toLocaleString()}</div>
-                  <div className="prod-price-sats mono-num">≈ {ngnToSats(prod.priceNgn).toLocaleString()} sats</div>
-                  <div className="prod-category-tag">{prod.category}</div>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: CHARGE TERMINAL & QR INVOICE */}
-        <div className="grid-col-secondary">
+        {/* RIGHT COLUMN (Desktop) / TAB 1 (Mobile): TACTILE POS CHARGE TERMINAL */}
+        <div className={`grid-col-secondary ${mobileTab === 'catalog' ? 'hide-on-mobile' : ''}`}>
           <div className="card pos-terminal-card">
             <div className="card-header-between">
-              <h3>Quick Charge Terminal</h3>
-              <span className="badge-offline">Offline Ecash / Lightning</span>
+              <h3 className="section-heading-clean">POS Checkout</h3>
+              <span className="badge-offline">
+                {isOffline ? 'Offline Bearer Mode' : 'Cashu & Lightning'}
+              </span>
             </div>
 
-            {/* Charge Display */}
+            {/* Amount Display Screen */}
             <div className="charge-display-box">
-              <div className="display-label">Charge Amount in Naira (NGN)</div>
+              <div className="display-label">
+                {customerMemo ? customerMemo : 'Amount Due (NGN)'}
+              </div>
               <div className="display-amount mono-num">₦{chargeNgn.toLocaleString()}</div>
-              <div className="display-sats mono-num">≈ {chargeSats.toLocaleString()} satoshis</div>
+              <div className="display-sats mono-num">{chargeSats.toLocaleString()} sats</div>
             </div>
 
-            {/* Numpad Presets */}
-            <div className="quick-presets-grid">
-              {[500, 1000, 2000, 5000, 10000, 20000].map((amt) => (
+            {/* Quick Presets */}
+            <div className="quick-presets-grid mb-2">
+              {[500, 1000, 2000, 5000].map((amt) => (
                 <button
                   key={amt}
                   type="button"
-                  className="preset-btn"
+                  className="preset-btn mono-num"
                   onClick={() => {
+                    soundController.playClick();
                     setChargeNgn(amt);
-                    generateInvoice(amt);
+                    setCustomerMemo('');
+                    generateInvoice(amt, '');
                   }}
                 >
                   ₦{amt.toLocaleString()}
@@ -248,33 +322,36 @@ export const PosPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Customer Note Input */}
-            <div className="input-group-fintech mt-3">
-              <label>Customer Reference Note (Optional)</label>
-              <input
-                type="text"
-                className="fintech-input"
-                placeholder="e.g. 2 bags of maize, passenger fare"
-                value={customerMemo}
-                onChange={(e) => setCustomerMemo(e.target.value)}
-              />
+            {/* Tactile POS Numpad */}
+            <div className="pos-numpad-grid">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'BACK'].map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`pos-numpad-key mono-num ${key === 'C' ? 'key-clear' : ''}`}
+                  onClick={() => handleDigitPress(key)}
+                >
+                  {key === 'BACK' ? <Delete size={16} /> : key}
+                </button>
+              ))}
             </div>
 
-            {/* QR Payment Code */}
+            {/* QR Invoice & Hardware Actions */}
             <div className="qr-container-box">
-              <QRCodeSVG
-                value={activeToken || `cashuA_${chargeSats}_sats`}
-                size={180}
-                bgColor="#0B0E14"
-                fgColor="#F7931A"
-                level="M"
-              />
-              <div className="qr-caption">Scan with any Cashu or Lightning wallet</div>
+              <div className="qr-frame-white">
+                <QRCodeSVG
+                  value={activeToken || `cashuA_${chargeSats}_sats`}
+                  size={156}
+                  bgColor="#FFFFFF"
+                  fgColor="#0B0E14"
+                  level="M"
+                />
+              </div>
 
               <div className="qr-actions-row">
                 <button type="button" className="btn-outline-sm" onClick={copyQrToken}>
-                  {copiedToken ? <Check size={14} /> : <Copy size={14} />}
-                  <span>{copiedToken ? 'Copied' : 'Copy Token'}</span>
+                  {copiedToken ? <Check size={13} /> : <Copy size={13} />}
+                  <span>{copiedToken ? 'Copied' : 'Copy'}</span>
                 </button>
 
                 <button
@@ -282,20 +359,30 @@ export const PosPage: React.FC = () => {
                   className="btn-outline-sm"
                   onClick={() => setShowNfcModal(true)}
                 >
-                  <Radio size={14} />
+                  <Radio size={13} />
                   <span>NFC Tap</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-outline-sm"
+                  onClick={() => setShowScanner(true)}
+                >
+                  <QrCode size={13} />
+                  <span>Scan Note</span>
                 </button>
               </div>
             </div>
 
-            {/* Payment Receiver Actions */}
             <div className="terminal-actions mt-3">
               <button
                 type="button"
                 className="btn-primary w-full"
+                disabled={chargeSats <= 0}
                 onClick={handlePaymentReceived}
               >
-                Simulate Customer Payment Received (Instant)
+                <CheckCircle2 size={17} />
+                <span>Confirm Payment ({chargeSats.toLocaleString()} sats)</span>
               </button>
             </div>
           </div>
@@ -307,12 +394,12 @@ export const PosPage: React.FC = () => {
         <div className="modal-overlay" onClick={() => setShowAddItemModal(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Add New Inventory Product</h3>
+              <h3>Add Catalog Item</h3>
               <button type="button" className="close-btn" onClick={() => setShowAddItemModal(false)}>✕</button>
             </div>
             <div className="modal-body">
               <div className="input-group-fintech">
-                <label>Product Name</label>
+                <label>Item Name</label>
                 <input
                   type="text"
                   className="fintech-input"
@@ -323,7 +410,7 @@ export const PosPage: React.FC = () => {
               </div>
 
               <div className="input-group-fintech">
-                <label>Price in Naira (NGN)</label>
+                <label>Price (NGN)</label>
                 <input
                   type="number"
                   className="fintech-input mono-num"
@@ -355,7 +442,7 @@ export const PosPage: React.FC = () => {
                   onClick={handleAddProduct}
                   disabled={!newItemName.trim() || !newItemPrice}
                 >
-                  Save Product to Catalog
+                  Save Item
                 </button>
               </div>
             </div>
@@ -363,7 +450,6 @@ export const PosPage: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: NFC TAP */}
       <NfcTapModal
         isOpen={showNfcModal}
         onClose={() => setShowNfcModal(false)}
@@ -371,7 +457,6 @@ export const PosPage: React.FC = () => {
         onComplete={handlePaymentReceived}
       />
 
-      {/* MODAL: QR SCANNER */}
       <QrScannerModal
         isOpen={showScanner}
         onClose={() => setShowScanner(false)}
@@ -379,10 +464,9 @@ export const PosPage: React.FC = () => {
           setShowScanner(false);
           handlePaymentReceived();
         }}
-        title="Scan Customer Token / QR Code"
+        title="Scan Customer Cashu Voucher"
       />
 
-      {/* MODAL: PRINTABLE RECEIPT */}
       <ReceiptModal
         isOpen={Boolean(receiptTx)}
         onClose={() => setReceiptTx(null)}

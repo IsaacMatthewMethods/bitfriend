@@ -18,7 +18,15 @@ import {
   saveSecureCircles,
   migrateFromLocalStorage,
 } from '../utils/secureStorage';
-import { isVaultBackedUp } from '../utils/bip39Vault';
+import {
+  isVaultBackedUp,
+  markVaultBackedUp,
+  saveMnemonic,
+  getStoredMnemonic,
+  deriveWalletIdentityFromMnemonic,
+  signAuthChallenge,
+} from '../utils/bip39Vault';
+import { ApiClient } from '../services/apiClient';
 import { soundController } from '../utils/audioVoice';
 import { useMarket } from './MarketContext';
 
@@ -61,14 +69,22 @@ export interface WalletContextType {
   claimCashuToken: (tokenString: string) => { success: boolean; amountSats?: number; error?: string };
   depositToLightning: (amountSats: number) => void;
   withdrawFromLightning: (amountSats: number) => boolean;
+  completeOnboarding: (params: {
+    name: string;
+    lightningAddress: string;
+    currency: 'NGN' | 'USD';
+    mnemonic: string[];
+    isRecovery?: boolean;
+  }) => Promise<void>;
+  signOutWallet: () => void;
 }
 
 const DEFAULT_PROFILE: UserProfile = {
-  name: 'Bello Ibrahim',
-  lightningAddress: 'bello.bitfriend.me',
-  pubkey: 'npub1bf99a07x87c4v29zq44e99m1234567890abcdef',
+  name: '',
+  lightningAddress: '',
+  pubkey: '',
   isVerified: true,
-  isOnboarded: true,
+  isOnboarded: false,
   currency: 'NGN',
 };
 
@@ -77,11 +93,24 @@ const WalletContext = createContext<WalletContextType | null>(null);
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { satsToNgn } = useMarket();
 
-  // User Profile
+  // User Profile (backed by deterministic BIP-39 secp256k1 identity)
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
     try {
+      const isAuthedV2 = localStorage.getItem('bitfriend_sovereign_authenticated_v2') === 'true';
+      if (!isAuthedV2) {
+        return DEFAULT_PROFILE;
+      }
+      const mnemonic = getStoredMnemonic();
+      const identity = deriveWalletIdentityFromMnemonic(mnemonic);
       const saved = localStorage.getItem('bitfriend_user_profile');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved) as UserProfile;
+        if (!parsed.pubkey || !/^[0-9a-f]{64,66}$/i.test(parsed.pubkey)) {
+          parsed.pubkey = identity.pubkeyCompressedHex;
+          localStorage.setItem('bitfriend_user_profile', JSON.stringify(parsed));
+        }
+        return { ...parsed, isOnboarded: true };
+      }
       return DEFAULT_PROFILE;
     } catch {
       return DEFAULT_PROFILE;
@@ -96,6 +125,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       } catch (err) {
         console.warn('Failed to save profile', err);
       }
+      // Sync to SQLite backend if online
+      ApiClient.updateProfile({
+        username: updated.name,
+        lightningAddress: updated.lightningAddress,
+        currency: updated.currency,
+      }).catch(() => {
+        // Offline fallback is already persisted in localStorage
+      });
       return updated;
     });
   };
@@ -134,6 +171,57 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Migrate from local storage if needed
     migrateFromLocalStorage().catch(console.warn);
 
+    // Authenticate with backend SQLite node using real BIP-340 Schnorr signature (only if onboarded)
+    (async () => {
+      try {
+        if (localStorage.getItem('bitfriend_sovereign_authenticated_v2') !== 'true') {
+          return;
+        }
+        const mnemonic = getStoredMnemonic();
+        const identity = deriveWalletIdentityFromMnemonic(mnemonic);
+        const health = await ApiClient.checkHealth();
+        if (!health.online || !mounted) return;
+
+        let profileData: any = null;
+        if (ApiClient.getAuthToken()) {
+          try {
+            profileData = await ApiClient.getProfile();
+          } catch {
+            // Token expired or revoked — re-authenticate via Schnorr challenge
+            ApiClient.setAuthToken(null);
+          }
+        }
+
+        if (!profileData) {
+          await ApiClient.authenticateWithSchnorr(
+            identity.pubkeyCompressedHex,
+            (nonce) => signAuthChallenge(nonce, mnemonic).signatureHex
+          );
+          profileData = await ApiClient.getProfile();
+        }
+
+        if (mounted && profileData?.user) {
+          setUserProfile((prev) => {
+            const synced: UserProfile = {
+              ...prev,
+              isOnboarded: true,
+              pubkey: identity.pubkeyCompressedHex,
+              name:
+                profileData.user.username && !profileData.user.username.startsWith('Vendor_')
+                  ? profileData.user.username
+                  : prev.name,
+              lightningAddress: profileData.user.lightning_address || prev.lightningAddress,
+              currency: (profileData.user.currency as 'NGN' | 'USD') || prev.currency,
+            };
+            localStorage.setItem('bitfriend_user_profile', JSON.stringify(synced));
+            return synced;
+          });
+        }
+      } catch {
+        // Offline mode: local vault remains active
+      }
+    })();
+
     // Load initial proofs
     getSecureProofs()
       .then((loaded) => {
@@ -167,22 +255,62 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       })
       .catch(console.warn);
 
-    // Load Adashi circles
-    getSecureCircles()
-      .then((loaded) => {
-        if (!mounted) return;
-        if (loaded && loaded.length > 0) {
-          setCircles(loaded);
-        } else {
-          try {
-            const saved = localStorage.getItem('bitfriend_adashi_circles');
-            if (saved) setCircles(JSON.parse(saved));
-          } catch (e) {
-            console.warn(e);
-          }
+    // Load Adashi circles from SQLite backend first, fallback to IndexedDB / localStorage
+    (async () => {
+      try {
+        const remoteCircles = await ApiClient.getAdashiCircles();
+        if (mounted && Array.isArray(remoteCircles) && remoteCircles.length > 0) {
+          const mapped: AdashiCircle[] = remoteCircles.map((rc: any) => ({
+            id: rc.id,
+            name: rc.title || rc.name,
+            category: rc.description || 'Cooperative Pool',
+            frequency: (rc.cycle_type || 'weekly').toLowerCase() as 'daily' | 'weekly' | 'monthly',
+            contributionSats: rc.contribution_sats || 25000,
+            currentRound: rc.current_round || 1,
+            totalRounds: rc.max_rounds || 5,
+            nextPayoutDate: 'Friday 4:00 PM',
+            members: Array.isArray(rc.members)
+              ? rc.members.map((m: any, idx: number) => ({
+                  id: m.id || `m_${idx}`,
+                  name: m.member_alias || m.name || 'Member',
+                  location: 'Northern Trade Corridor',
+                  avatar: (m.member_alias || 'BF')
+                    .split(' ')
+                    .map((w: string) => w[0])
+                    .join('')
+                    .toUpperCase()
+                    .slice(0, 2),
+                  hasContributed:
+                    (m.total_contributed_sats || 0) >=
+                    (rc.current_round || 1) * (rc.contribution_sats || 25000),
+                  turnOrder: m.round_payout_index || idx + 1,
+                  isCurrentRecipient: (m.round_payout_index || idx + 1) === (rc.current_round || 1),
+                }))
+              : [],
+          }));
+          setCircles(mapped);
+          saveSecureCircles(mapped).catch(() => {});
+          return;
         }
-      })
-      .catch(console.warn);
+      } catch {
+        // Offline fallback
+      }
+      getSecureCircles()
+        .then((loaded) => {
+          if (!mounted) return;
+          if (loaded && loaded.length > 0) {
+            setCircles(loaded);
+          } else {
+            try {
+              const saved = localStorage.getItem('bitfriend_adashi_circles');
+              if (saved) setCircles(JSON.parse(saved));
+            } catch (e) {
+              console.warn(e);
+            }
+          }
+        })
+        .catch(console.warn);
+    })();
 
     // Online/Offline listener
     const onOnline = () => setIsOffline(false);
@@ -218,12 +346,26 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
       return updated;
     });
+
+    // Persist transaction record to SQLite backend if online
+    ApiClient.recordTransaction({
+      pubkey: userProfile.pubkey,
+      txHash: tx.id,
+      direction: tx.type === 'incoming' ? 'INCOMING' : 'OUTGOING',
+      type: tx.method === 'lightning' ? 'LIGHTNING_INVOICE' : 'CASHU_ECASH',
+      amountSats: tx.amountSats,
+      amountNgn: tx.amountNgn,
+      status: tx.status.toUpperCase(),
+      memo: tx.memo,
+      proofCount: 1,
+    }).catch(() => {});
   };
 
   const updateProofs = (newProofs: CashuProof[]) => {
     setProofs(newProofs);
     saveStoredProofs(newProofs);
     saveSecureProofs(newProofs).catch(console.warn);
+    ApiClient.syncProofs(newProofs, undefined, userProfile.pubkey).catch(() => {});
   };
 
   const updateCircles = (newCircles: AdashiCircle[]) => {
@@ -273,9 +415,54 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return { success: false, error: 'Invalid or empty Cashu token' };
       }
 
+      // Check local double-spend registry
+      const existingSecrets = new Set(proofs.map((p) => p.secret));
+      let claimedSecrets: string[] = [];
+      try {
+        const rawClaimed = localStorage.getItem('bitfriend_claimed_secrets');
+        if (rawClaimed) claimedSecrets = JSON.parse(rawClaimed);
+      } catch {
+        // ignore
+      }
+      const spentSet = new Set(claimedSecrets);
+
+      for (const p of decoded.proofs) {
+        if (existingSecrets.has(p.secret) || spentSet.has(p.secret)) {
+          return {
+            success: false,
+            error: `Double-spend detected! Voucher proof ${p.secret.slice(0, 12)}... has already been redeemed.`,
+          };
+        }
+      }
+
+      // Record secrets as claimed locally
+      try {
+        const updatedClaimed = [...claimedSecrets, ...decoded.proofs.map((p) => p.secret)].slice(-500);
+        localStorage.setItem('bitfriend_claimed_secrets', JSON.stringify(updatedClaimed));
+      } catch {
+        // ignore
+      }
+
       const incomingAmount = decoded.proofs.reduce((sum, p) => sum + p.amount, 0);
       const combined = [...proofs, ...decoded.proofs];
       updateProofs(combined);
+
+      // Perform atomic NUT-03 claim & swap on SQLite backend if online
+      ApiClient.claimProofs(decoded.proofs, decoded.mint, userProfile.pubkey)
+        .then((res) => {
+          if (res && Array.isArray(res.freshProofs) && res.freshProofs.length > 0) {
+            const incomingSecretSet = new Set(decoded.proofs.map((p) => p.secret));
+            setProofs((curr) => {
+              const swapped = curr.filter((p) => !incomingSecretSet.has(p.secret)).concat(res.freshProofs);
+              saveStoredProofs(swapped);
+              saveSecureProofs(swapped).catch(console.warn);
+              return swapped;
+            });
+          }
+        })
+        .catch(() => {
+          // Offline mode: local proofs remain stored until auto-swap on reconnect
+        });
 
       const tx: PaymentTransaction = {
         id: `tx_${Date.now()}`,
@@ -315,6 +502,84 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return true;
   };
 
+  const completeOnboarding = async (params: {
+    name: string;
+    lightningAddress: string;
+    currency: 'NGN' | 'USD';
+    mnemonic: string[];
+    isRecovery?: boolean;
+  }) => {
+    saveMnemonic(params.mnemonic);
+    markVaultBackedUp();
+    setVaultBackedUp(true);
+
+    const identity = deriveWalletIdentityFromMnemonic(params.mnemonic);
+
+    let finalName = params.name.trim() || 'Sovereign Merchant';
+    let finalHandle =
+      params.lightningAddress.trim() ||
+      `${finalName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 16) || 'merchant'}@bitfriend.me`;
+    let finalCurrency = params.currency || 'NGN';
+
+    try {
+      const health = await ApiClient.checkHealth();
+      if (health.online) {
+        await ApiClient.authenticateWithSchnorr(
+          identity.pubkeyCompressedHex,
+          (nonce) => signAuthChallenge(nonce, params.mnemonic).signatureHex
+        );
+
+        if (params.isRecovery && !params.name.trim()) {
+          const existing = await ApiClient.getProfile();
+          if (existing?.user) {
+            if (existing.user.username && !existing.user.username.startsWith('Vendor_')) {
+              finalName = existing.user.username;
+            }
+            if (existing.user.lightning_address) {
+              finalHandle = existing.user.lightning_address;
+            }
+            if (existing.user.currency) {
+              finalCurrency = existing.user.currency as 'NGN' | 'USD';
+            }
+          }
+        } else {
+          await ApiClient.updateProfile({
+            username: finalName,
+            lightningAddress: finalHandle,
+            currency: finalCurrency,
+          });
+        }
+
+        // Sync or restore proofs with backend SQLite mint
+        if (proofs.length > 0) {
+          await ApiClient.syncProofs(proofs, undefined, identity.pubkeyCompressedHex).catch(() => {});
+        }
+      }
+    } catch (err) {
+      console.warn('Backend onboarding sync warning (continuing with local sovereign vault):', err);
+    }
+
+    const onboardedProfile: UserProfile = {
+      name: finalName,
+      lightningAddress: finalHandle,
+      pubkey: identity.pubkeyCompressedHex,
+      isVerified: true,
+      isOnboarded: true,
+      currency: finalCurrency,
+    };
+
+    localStorage.setItem('bitfriend_user_profile', JSON.stringify(onboardedProfile));
+    localStorage.setItem('bitfriend_sovereign_authenticated_v2', 'true');
+    setUserProfile(onboardedProfile);
+  };
+
+  const signOutWallet = () => {
+    localStorage.removeItem('bitfriend_sovereign_authenticated_v2');
+    localStorage.removeItem('bitfriend_user_profile');
+    ApiClient.setAuthToken(null);
+    setUserProfile(DEFAULT_PROFILE);
+  };
+
   return (
     <WalletContext.Provider
       value={{
@@ -347,6 +612,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         claimCashuToken,
         depositToLightning,
         withdrawFromLightning,
+        completeOnboarding,
+        signOutWallet,
       }}
     >
       {children}

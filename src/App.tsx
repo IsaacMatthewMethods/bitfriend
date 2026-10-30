@@ -12,10 +12,15 @@ import { AdashiPage } from './pages/AdashiPage';
 import { CashOutPage } from './pages/CashOutPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PinLockModal } from './components/PinLockModal';
+import { SovereignAuthScreen } from './components/SovereignAuthScreen';
 import './App.css';
 
 const AppLayout: React.FC = () => {
-  const { isLocked, setIsLocked, lang } = useWallet();
+  const { userProfile, isLocked, setIsLocked, lang } = useWallet();
+
+  if (!userProfile.isOnboarded) {
+    return <SovereignAuthScreen />;
+  }
 
   return (
     <div className="fintech-app-wrapper">

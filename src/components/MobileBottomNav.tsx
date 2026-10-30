@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Wallet, TrendingUp, Store, MessageSquare, Building2 } from 'lucide-react';
+import { Wallet, TrendingUp, Store, MessageSquare, Users, Building2 } from 'lucide-react';
 import { soundController } from '../utils/audioVoice';
 
 export const MobileBottomNav: React.FC = () => {
@@ -13,9 +13,9 @@ export const MobileBottomNav: React.FC = () => {
         onClick={() => soundController.playClick()}
       >
         <div className="dock-icon">
-          <Wallet size={20} />
+          <Wallet size={19} />
         </div>
-        <span>Portfolio</span>
+        <span>Wallet</span>
       </NavLink>
 
       <NavLink
@@ -24,7 +24,7 @@ export const MobileBottomNav: React.FC = () => {
         onClick={() => soundController.playClick()}
       >
         <div className="dock-icon">
-          <TrendingUp size={20} />
+          <TrendingUp size={19} />
         </div>
         <span>Markets</span>
       </NavLink>
@@ -35,9 +35,9 @@ export const MobileBottomNav: React.FC = () => {
         onClick={() => soundController.playClick()}
       >
         <div className="dock-icon">
-          <Store size={20} />
+          <Store size={19} />
         </div>
-        <span>POS Pay</span>
+        <span>POS</span>
       </NavLink>
 
       <NavLink
@@ -46,9 +46,20 @@ export const MobileBottomNav: React.FC = () => {
         onClick={() => soundController.playClick()}
       >
         <div className="dock-icon">
-          <MessageSquare size={20} />
+          <MessageSquare size={19} />
         </div>
         <span>BitChat</span>
+      </NavLink>
+
+      <NavLink
+        to="/adashi"
+        className={({ isActive }) => `dock-item ${isActive ? 'active' : ''}`}
+        onClick={() => soundController.playClick()}
+      >
+        <div className="dock-icon">
+          <Users size={19} />
+        </div>
+        <span>Adashi</span>
       </NavLink>
 
       <NavLink
@@ -57,7 +68,7 @@ export const MobileBottomNav: React.FC = () => {
         onClick={() => soundController.playClick()}
       >
         <div className="dock-icon">
-          <Building2 size={20} />
+          <Building2 size={19} />
         </div>
         <span>Cash Out</span>
       </NavLink>

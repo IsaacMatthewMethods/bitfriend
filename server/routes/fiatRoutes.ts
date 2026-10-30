@@ -17,27 +17,33 @@ router.get('/banks', (_req: Request, res: Response) => {
   res.json({ success: true, data: SUPPORTED_BANKS });
 });
 
-router.post('/resolve-nuban', (req: Request, res: Response) => {
+router.post('/resolve-nuban', async (req: Request, res: Response) => {
   try {
     const { bankCode, accountNumber } = req.body;
     if (!bankCode || !accountNumber) {
-      res.status(400).json({ success: false, error: 'Both bankCode and 10-digit accountNumber are required.' });
+      res.status(400).json({
+        success: false,
+        error: 'Both bankCode and 10-digit accountNumber are required.',
+      });
       return;
     }
 
-    const resolved = FiatGatewayService.resolveNubanAccount(bankCode, accountNumber);
+    const resolved = await FiatGatewayService.resolveNubanAccount(bankCode, accountNumber);
     res.json({ success: true, data: resolved });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });
   }
 });
 
-router.post('/link-bank', optionalAuth, (req: Request, res: Response) => {
+router.post('/link-bank', optionalAuth, async (req: Request, res: Response) => {
   try {
-    const pubkey = req.user?.pubkey || req.body.pubkey || '02a1633cafcc01ebfb6d78e39f687a1f099016ea6365fec27c0fa555df67048a58';
+    const pubkey =
+      req.user?.pubkey ||
+      req.body.pubkey ||
+      '02a1633cafcc01ebfb6d78e39f687a1f099016ea6365fec27c0fa555df67048a58';
     const { bankCode, accountNumber } = req.body;
 
-    const saved = FiatGatewayService.saveBankAccount(pubkey, bankCode, accountNumber);
+    const saved = await FiatGatewayService.saveBankAccount(pubkey, bankCode, accountNumber);
     res.json({ success: true, data: saved });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });
@@ -46,7 +52,10 @@ router.post('/link-bank', optionalAuth, (req: Request, res: Response) => {
 
 router.post('/quote', optionalAuth, (req: Request, res: Response) => {
   try {
-    const pubkey = req.user?.pubkey || req.body.pubkey || '02a1633cafcc01ebfb6d78e39f687a1f099016ea6365fec27c0fa555df67048a58';
+    const pubkey =
+      req.user?.pubkey ||
+      req.body.pubkey ||
+      '02a1633cafcc01ebfb6d78e39f687a1f099016ea6365fec27c0fa555df67048a58';
     const { satsAmount, bankAccountId } = req.body;
 
     if (!satsAmount) {
@@ -54,7 +63,7 @@ router.post('/quote', optionalAuth, (req: Request, res: Response) => {
       return;
     }
 
-    const quote = FiatGatewayService.createOfframpQuote(pubkey, satsAmount, bankAccountId);
+    const quote = FiatGatewayService.createOfframpQuote(pubkey, Number(satsAmount), bankAccountId);
     res.json({ success: true, data: quote });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });

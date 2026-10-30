@@ -14,6 +14,9 @@ import fiatRoutes from './routes/fiatRoutes.js';
 import adashiRoutes from './routes/adashiRoutes.js';
 import posRoutes from './routes/posRoutes.js';
 import marketRoutes from './routes/marketRoutes.js';
+import lightningRoutes from './routes/lightningRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
+import { LightningService } from './services/lightningService.js';
 
 // 1. Initialize SQLite Database & Tables
 initializeDatabase();
@@ -84,6 +87,19 @@ app.get('/api', (_req, res) => {
   });
 });
 
+// 3b. Standard LUD-16 LNURL-pay Discovery Endpoint (/.well-known/lnurlp/:username)
+app.get('/.well-known/lnurlp/:username', (req, res) => {
+  try {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers.host || 'localhost:4000';
+    const baseUrl = `${protocol}://${host}`;
+    const metadata = LightningService.getLnurlPayMetadata(req.params.username, baseUrl);
+    res.json(metadata);
+  } catch (err: any) {
+    res.status(400).json({ status: 'ERROR', reason: err.message });
+  }
+});
+
 // 4. Mount API Routes
 app.use('/api/v1/health', healthRoutes);
 app.use('/api/v1/auth', authRoutes);
@@ -93,6 +109,8 @@ app.use('/api/v1/fiat', fiatRoutes);
 app.use('/api/v1/adashi', adashiRoutes);
 app.use('/api/v1/pos', posRoutes);
 app.use('/api/v1/market', marketRoutes);
+app.use('/api/v1/lightning', lightningRoutes);
+app.use('/api/v1/chat', chatRoutes);
 
 // 5. Global Error Handler
 app.use(errorHandler);

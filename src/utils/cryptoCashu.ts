@@ -1,46 +1,50 @@
 // Real Elliptic Curve Cryptography on secp256k1 (Cashu BDHKE / NUT-00)
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex } from '@noble/hashes/utils.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import type { CashuProof } from '../types';
+
+const CURVE_N = BigInt('0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141');
+const DEFAULT_MINT_SEED = 'bitfriend_production_mint_master_seed_2026_v1';
+const DENOMINATIONS = [
+  1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072,
+];
+
+function hexToValidScalar(hexStr: string): bigint {
+  const clean = hexStr.replace(/^0x/i, '');
+  const raw = BigInt(`0x${clean}`);
+  const modded = raw % (CURVE_N - 1n);
+  return modded === 0n ? 1n : modded;
+}
 
 /**
  * Cashu NUT-00 Hash-to-Curve (h2c)
- * Deterministically maps a token secret string to an authentic point on the secp256k1 elliptic curve.
+ * Deterministically maps a token secret string to an authentic point Y on secp256k1.
  */
 export function hashToCurvePoint(secret: string): { pointHex: string; x: string; y: string } {
   let counter = 0;
   const encoder = new TextEncoder();
-  
+
   while (counter < 256) {
     const input = encoder.encode(`Secp256k1_HashToCurve_Cashu_${secret}_${counter}`);
-    const hash = sha256(input);
-    const hashHex = bytesToHex(hash);
-    
-    // Attempt compressed point with prefix 02
-    try {
-      const point = secp256k1.Point.fromHex(`02${hashHex}`);
-      return {
-        pointHex: point.toHex(true),
-        x: point.x.toString(16),
-        y: point.y.toString(16),
-      };
-    } catch {
-      // If 02 fails, try 03
+    const hashHex = bytesToHex(sha256(input));
+
+    for (const prefix of ['02', '03']) {
       try {
-        const point = secp256k1.Point.fromHex(`03${hashHex}`);
+        const point = secp256k1.Point.fromHex(`${prefix}${hashHex}`);
+        point.assertValidity();
         return {
           pointHex: point.toHex(true),
           x: point.x.toString(16),
           y: point.y.toString(16),
         };
       } catch {
-        counter++;
+        // try next prefix or counter
       }
     }
+    counter++;
   }
 
-  // Fallback to generator point if no counter hit
   const gen = secp256k1.Point.BASE;
   return {
     pointHex: gen.toHex(true),
@@ -50,36 +54,76 @@ export function hashToCurvePoint(secret: string): { pointHex: string; x: string;
 }
 
 /**
- * Generate cryptographic proof with genuine secp256k1 private secret and public unblinded signature
+ * Alice Step 1 (NUT-00): Blind secret Y with scalar r: B_ = Y + r * G
  */
-export function generateRealCryptoProof(amount: number, mintPubkeyHex?: string): CashuProof {
-  const privKeyBytes = secp256k1.utils.randomSecretKey();
-  const secretHex = bytesToHex(privKeyBytes);
-  const secret = `bitfriend_sec_${secretHex.slice(0, 24)}`;
-  
-  // Deterministic point from secret
-  const { pointHex } = hashToCurvePoint(secret);
-  
-  // Calculate signature C = k * Y or sign using mint pubkey
-  let signatureC: string;
-  try {
-    if (mintPubkeyHex && mintPubkeyHex.length === 66) {
-      const mintPoint = secp256k1.Point.fromHex(mintPubkeyHex);
-      const secretPoint = secp256k1.Point.fromHex(pointHex);
-      const combined = mintPoint.add(secretPoint);
-      signatureC = combined.toHex(true);
-    } else {
-      const randomScalar = secp256k1.utils.randomSecretKey();
-      const randomScalarBigInt = BigInt(`0x${bytesToHex(randomScalar)}`);
-      const sigPoint = secp256k1.Point.fromHex(pointHex).multiply(randomScalarBigInt);
-      signatureC = sigPoint.toHex(true);
-    }
-  } catch {
-    signatureC = `02${secretHex}`;
-  }
+export function blindMessageClient(secret: string, rHex?: string): { B_: string; rHex: string; Y: string } {
+  const actualRHex = rHex || bytesToHex(secp256k1.utils.randomSecretKey());
+  const rScalar = hexToValidScalar(actualRHex);
+  const { pointHex: yHex } = hashToCurvePoint(secret);
+  const YPoint = secp256k1.Point.fromHex(yHex);
+  const rG = secp256k1.Point.BASE.multiply(rScalar);
+  const B_Point = YPoint.add(rG);
 
   return {
-    id: 'mint_minibits_btc',
+    B_: B_Point.toHex(true),
+    rHex: actualRHex,
+    Y: yHex,
+  };
+}
+
+/**
+ * Alice Step 3 (NUT-00): Unblind signature C_ from Mint using blinding factor r and Mint pubkey K:
+ * C = C_ - r * K
+ */
+export function unblindSignatureClient(C_Hex: string, rHex: string, KPubHex: string): string {
+  const C_Point = secp256k1.Point.fromHex(C_Hex);
+  const KPoint = secp256k1.Point.fromHex(KPubHex);
+  const rScalar = hexToValidScalar(rHex);
+  const rK = KPoint.multiply(rScalar);
+  const CPoint = C_Point.add(rK.negate());
+  return CPoint.toHex(true);
+}
+
+let cachedDefaultKeysetId: string | null = null;
+const cachedPrivKeys: Record<number, string> = {};
+const cachedPubKeys: Record<number, string> = {};
+
+function ensureDefaultKeysetCache(): string {
+  if (cachedDefaultKeysetId) return cachedDefaultKeysetId;
+  const enc = new TextEncoder();
+  const concatPubkeys: number[] = [];
+  for (const amt of DENOMINATIONS) {
+    const privBytes = sha256(enc.encode(`${DEFAULT_MINT_SEED}:sat:${amt}`));
+    const privHex = bytesToHex(privBytes);
+    const pubBytes = secp256k1.getPublicKey(hexToBytes(privHex), true);
+    cachedPrivKeys[amt] = privHex;
+    cachedPubKeys[amt] = bytesToHex(pubBytes);
+    concatPubkeys.push(...pubBytes);
+  }
+  const keysetHashHex = bytesToHex(sha256(new Uint8Array(concatPubkeys)));
+  cachedDefaultKeysetId = `00${keysetHashHex.slice(0, 14)}`;
+  return cachedDefaultKeysetId;
+}
+
+/**
+ * Generate cryptographic proof with genuine secp256k1 BDHKE blind signature & unblinding
+ */
+export function generateRealCryptoProof(amount: number, _mintPubkeyHex?: string): CashuProof {
+  const keysetId = ensureDefaultKeysetCache();
+  const privKeyBytes = secp256k1.utils.randomSecretKey();
+  const secretHex = bytesToHex(privKeyBytes);
+  const secret = `bitfriend_sec_${secretHex.slice(0, 28)}`;
+
+  const kPrivHex = cachedPrivKeys[amount] || cachedPrivKeys[1];
+  const KPubHex = cachedPubKeys[amount] || cachedPubKeys[1];
+
+  const { B_, rHex } = blindMessageClient(secret);
+  const kScalar = hexToValidScalar(kPrivHex);
+  const C_Point = secp256k1.Point.fromHex(B_).multiply(kScalar);
+  const signatureC = unblindSignatureClient(C_Point.toHex(true), rHex, KPubHex);
+
+  return {
+    id: keysetId,
     amount,
     secret,
     C: signatureC,
@@ -100,23 +144,23 @@ export function verifyProofCurveSignature(proof: CashuProof): {
 } {
   try {
     const { x, y } = hashToCurvePoint(proof.secret);
-    
-    // Verify C is a valid point on secp256k1
+
     let isValidPoint = false;
     try {
       const sigPoint = secp256k1.Point.fromHex(proof.C);
+      sigPoint.assertValidity();
       isValidPoint = Boolean(sigPoint && sigPoint.x);
     } catch {
       isValidPoint = false;
     }
 
     return {
-      isValid: isValidPoint || proof.C.startsWith('02') || proof.C.startsWith('03'),
+      isValid: isValidPoint,
       curveDetails: {
         pointX: x,
         pointY: y,
         signatureHex: proof.C,
-        curveName: 'secp256k1 (Bitcoin Standard)',
+        curveName: 'secp256k1 (BDHKE NUT-00)',
       },
     };
   } catch {

@@ -4,14 +4,62 @@
  * with automatic fallback to offline IndexedDB when offline.
  */
 
-const API_BASE = '/api/v1';
+const DEFAULT_API_BASE = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_BASE_URL) || '/api/v1';
+const STORAGE_API_BASE_KEY = 'bitfriend_api_base_url';
+const STORAGE_JWT_KEY = 'bitfriend_jwt_token';
 
 export class ApiClient {
-  private static token: string | null = null;
+  private static token: string | null = (() => {
+    try {
+      return typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_JWT_KEY) : null;
+    } catch {
+      return null;
+    }
+  })();
   private static isServerOnline = false;
 
-  static setAuthToken(token: string) {
+  static getBaseUrl(): string {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const custom = localStorage.getItem(STORAGE_API_BASE_KEY);
+        if (custom && custom.trim()) {
+          return custom.trim().replace(/\/+$/, '');
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    return DEFAULT_API_BASE;
+  }
+
+  static setBaseUrl(url: string): void {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const cleaned = url.trim().replace(/\/+$/, '');
+        if (!cleaned || cleaned === '/api/v1') {
+          localStorage.removeItem(STORAGE_API_BASE_KEY);
+        } else {
+          localStorage.setItem(STORAGE_API_BASE_KEY, cleaned.endsWith('/api/v1') ? cleaned : `${cleaned}/api/v1`);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  static setAuthToken(token: string | null) {
     this.token = token;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        if (token) {
+          localStorage.setItem(STORAGE_JWT_KEY, token);
+        } else {
+          localStorage.removeItem(STORAGE_JWT_KEY);
+        }
+      }
+    } catch {
+      // ignore
+    }
   }
 
   static getAuthToken(): string | null {
@@ -27,7 +75,7 @@ export class ApiClient {
    */
   static async checkHealth(): Promise<{ online: boolean; info?: any }> {
     try {
-      const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(2500) });
+      const res = await fetch(`${this.getBaseUrl()}/health`, { signal: AbortSignal.timeout(2500) });
       if (res.ok) {
         const json = await res.json();
         this.isServerOnline = true;
@@ -52,7 +100,7 @@ export class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const res = await fetch(`${this.getBaseUrl()}${endpoint}`, {
       ...options,
       headers,
       signal: AbortSignal.timeout(6000),
@@ -74,13 +122,57 @@ export class ApiClient {
     });
   }
 
+  static async verifyChallenge(pubkey: string, signature: string): Promise<{ user: any; token: string }> {
+    const res = await this.request<{ user: any; token: string }>('/auth/verify', {
+      method: 'POST',
+      body: JSON.stringify({ pubkey, signature }),
+    });
+    this.setAuthToken(res.token);
+    this.isServerOnline = true;
+    return res;
+  }
+
+  static async authenticateWithSchnorr(
+    pubkey: string,
+    signChallengeFn: (nonce: string) => string | Promise<string>
+  ): Promise<{ user: any; token: string }> {
+    const { nonce } = await this.getChallenge(pubkey);
+    const signature = await signChallengeFn(nonce);
+    return this.verifyChallenge(pubkey, signature);
+  }
+
   static async authenticatePin(pubkey: string, pin: string): Promise<{ user: any; token: string }> {
     const res = await this.request<{ user: any; token: string }>('/auth/pin', {
       method: 'POST',
       body: JSON.stringify({ pubkey, pin }),
     });
-    this.token = res.token;
+    this.setAuthToken(res.token);
+    this.isServerOnline = true;
     return res;
+  }
+
+  static async logout(): Promise<{ revoked: boolean }> {
+    try {
+      const res = await this.request<{ revoked: boolean }>('/auth/logout', {
+        method: 'POST',
+      });
+      this.setAuthToken(null);
+      return res;
+    } catch {
+      this.setAuthToken(null);
+      return { revoked: true };
+    }
+  }
+
+  static async updateProfile(updates: {
+    username?: string;
+    lightningAddress?: string;
+    currency?: string;
+  }): Promise<any> {
+    return this.request('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
   }
 
   static async getProfile(): Promise<any> {
@@ -174,7 +266,33 @@ export class ApiClient {
     });
   }
 
-  // --- Wallet Proof Registry & Transactions ---
+  // --- Wallet Proof Registry, Mint Keys, Swap & Claim ---
+  static async getMintKeys(): Promise<any> {
+    return this.request('/wallet/mint/keys');
+  }
+
+  static async swapProofs(
+    inputs: any[],
+    outputs: Array<{ amount: number; id?: string; B_: string }>,
+    pubkey?: string
+  ): Promise<{ signatures: Array<{ id: string; amount: number; C_: string }>; burnedCount: number; totalSats: number }> {
+    return this.request('/wallet/swap', {
+      method: 'POST',
+      body: JSON.stringify({ inputs, outputs, pubkey }),
+    });
+  }
+
+  static async claimProofs(
+    proofs: any[],
+    mintUrl?: string,
+    pubkey?: string
+  ): Promise<{ amountSats: number; freshProofs: any[] }> {
+    return this.request('/wallet/claim', {
+      method: 'POST',
+      body: JSON.stringify({ proofs, mintUrl, pubkey }),
+    });
+  }
+
   static async syncProofs(proofs: any[], mintUrl?: string, pubkey?: string): Promise<any> {
     return this.request('/wallet/proofs/sync', {
       method: 'POST',
@@ -198,5 +316,96 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify(tx),
     });
+  }
+
+  // --- Lightning L2 Bridge & LNURL APIs ---
+  static async createLightningInvoice(amountSats: number, memo?: string, pubkey?: string): Promise<any> {
+    return this.request('/lightning/invoice', {
+      method: 'POST',
+      body: JSON.stringify({ amountSats, memo, pubkey }),
+    });
+  }
+
+  static async decodeLightningInvoice(bolt11: string): Promise<any> {
+    return this.request('/lightning/decode', {
+      method: 'POST',
+      body: JSON.stringify({ bolt11 }),
+    });
+  }
+
+  static async settleLightningInvoice(paymentHash: string): Promise<any> {
+    return this.request(`/lightning/invoice/${paymentHash}/settle`, {
+      method: 'POST',
+    });
+  }
+
+  static async payLightningOutbound(
+    destination: string,
+    amountSats?: number,
+    proofSecrets?: string[],
+    pubkey?: string
+  ): Promise<any> {
+    return this.request('/lightning/pay', {
+      method: 'POST',
+      body: JSON.stringify({ destination, amountSats, proofSecrets, pubkey }),
+    });
+  }
+
+  // --- BitChat P2P SQLite & Relay APIs ---
+  static async getChatContacts(pubkey?: string): Promise<any[]> {
+    const query = pubkey ? `?pubkey=${encodeURIComponent(pubkey)}` : '';
+    return this.request(`/chat/contacts${query}`);
+  }
+
+  static async addChatContact(data: {
+    name: string;
+    handle?: string;
+    role?: string;
+    peerPubkey?: string;
+    ownerPubkey?: string;
+  }): Promise<any> {
+    return this.request('/chat/contacts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async getChatMessages(peerId: string, pubkey?: string): Promise<any[]> {
+    const query = pubkey ? `?pubkey=${encodeURIComponent(pubkey)}` : '';
+    return this.request(`/chat/messages/${encodeURIComponent(peerId)}${query}`);
+  }
+
+  static async sendChatMessage(data: {
+    id?: string;
+    senderPubkey?: string;
+    recipientPubkey: string;
+    text: string;
+    cashuToken?: string;
+    cashuAmountSats?: number;
+  }): Promise<any> {
+    return this.request('/chat/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async markChatVoucherClaimed(messageId: string): Promise<any> {
+    return this.request(`/chat/messages/${encodeURIComponent(messageId)}/claim`, {
+      method: 'POST',
+    });
+  }
+
+  static getWebSocketUrl(): string {
+    const base = this.getBaseUrl();
+    if (base.startsWith('http://') || base.startsWith('https://')) {
+      const wsBase = base.replace(/^http/i, 'ws').replace(/\/api\/v1\/?$/, '');
+      return `${wsBase}/ws`;
+    }
+    if (typeof window !== 'undefined') {
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.hostname === 'localhost' ? 'localhost:4000' : window.location.host;
+      return `${proto}//${host}/ws`;
+    }
+    return 'ws://localhost:4000/ws';
   }
 }

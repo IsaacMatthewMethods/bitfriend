@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   pubkey TEXT UNIQUE NOT NULL,
   username TEXT,
+  lightning_address TEXT,
+  currency TEXT DEFAULT 'NGN',
   role TEXT DEFAULT 'vendor',
   pin_hash TEXT,
   pin_salt TEXT,
@@ -18,6 +20,26 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_users_pubkey ON users(pubkey);
+
+-- 1b. Cryptographic Auth Challenges (Schnorr secp256k1 Nonces)
+CREATE TABLE IF NOT EXISTS auth_challenges (
+  pubkey TEXT PRIMARY KEY,
+  nonce TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+-- 1c. Authenticated User Sessions (JWT Registry & Revocation)
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id TEXT PRIMARY KEY,
+  pubkey TEXT NOT NULL,
+  token_hash TEXT UNIQUE NOT NULL,
+  device_info TEXT,
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_pubkey ON user_sessions(pubkey);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_token_hash ON user_sessions(token_hash);
 
 -- 2. Wallets & Mint Bindings
 CREATE TABLE IF NOT EXISTS wallets (
@@ -192,3 +214,66 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_logs_event ON audit_logs(event_type);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
+
+-- 13. Cashu Mint Keysets (NUT-01/NUT-02 BDHKE secp256k1 Keys)
+CREATE TABLE IF NOT EXISTS mint_keysets (
+  id TEXT PRIMARY KEY,
+  unit TEXT DEFAULT 'sat',
+  active INTEGER DEFAULT 1,
+  privkeys_json TEXT NOT NULL,
+  pubkeys_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+-- 14. BitChat P2P Contacts
+CREATE TABLE IF NOT EXISTS chat_contacts (
+  id TEXT PRIMARY KEY,
+  owner_pubkey TEXT NOT NULL,
+  peer_pubkey TEXT NOT NULL,
+  peer_name TEXT NOT NULL,
+  peer_role TEXT DEFAULT 'Merchant',
+  lightning_address TEXT,
+  created_at INTEGER NOT NULL,
+  UNIQUE(owner_pubkey, peer_pubkey)
+);
+CREATE INDEX IF NOT EXISTS idx_chat_contacts_owner ON chat_contacts(owner_pubkey);
+
+-- 15. BitChat P2P Messages & Embedded Cashu Vouchers
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id TEXT PRIMARY KEY,
+  sender_pubkey TEXT NOT NULL,
+  recipient_pubkey TEXT NOT NULL,
+  text TEXT NOT NULL,
+  cashu_token TEXT,
+  cashu_amount_sats INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'SENT',
+  is_claimed INTEGER DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_sender ON chat_messages(sender_pubkey);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_recipient ON chat_messages(recipient_pubkey);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_created ON chat_messages(created_at ASC);
+
+-- 16. Lightning L2 Invoices & Quotes (BOLT-11 / LNURL)
+CREATE TABLE IF NOT EXISTS lightning_invoices (
+  payment_hash TEXT PRIMARY KEY,
+  user_pubkey TEXT NOT NULL,
+  bolt11 TEXT NOT NULL,
+  amount_sats INTEGER NOT NULL,
+  memo TEXT,
+  status TEXT DEFAULT 'UNPAID',
+  preimage TEXT,
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  settled_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_ln_invoices_user ON lightning_invoices(user_pubkey);
+
+-- 17. Verified NUBAN Lookup Cache
+CREATE TABLE IF NOT EXISTS nuban_cache (
+  bank_code TEXT NOT NULL,
+  account_number TEXT NOT NULL,
+  account_name TEXT NOT NULL,
+  verified_at INTEGER NOT NULL,
+  PRIMARY KEY (bank_code, account_number)
+);

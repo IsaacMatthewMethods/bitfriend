@@ -7,6 +7,8 @@ import {
   isVaultLocked,
   recordActivity
 } from '../utils/secureStorage';
+import { getStoredMnemonic, deriveWalletIdentityFromMnemonic } from '../utils/bip39Vault';
+import { ApiClient } from '../services/apiClient';
 import { soundController } from '../utils/audioVoice';
 import type { Language } from '../types';
 
@@ -82,6 +84,12 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({
     if (mode === 'unlock') {
       const ok = await unlockVault(completedPin);
       if (ok) {
+        try {
+          const identity = deriveWalletIdentityFromMnemonic(getStoredMnemonic());
+          ApiClient.authenticatePin(identity.pubkeyCompressedHex, completedPin).catch(() => {});
+        } catch {
+          // ignore offline
+        }
         soundController.playPaymentChime();
         setPin('');
         setError('');
@@ -100,6 +108,12 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({
       if (completedPin === setupPin) {
         try {
           await setVaultPin(completedPin);
+          try {
+            const identity = deriveWalletIdentityFromMnemonic(getStoredMnemonic());
+            await ApiClient.authenticatePin(identity.pubkeyCompressedHex, completedPin).catch(() => {});
+          } catch {
+            // ignore offline
+          }
           soundController.playPaymentChime();
           setPin('');
           setError('');

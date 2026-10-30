@@ -125,20 +125,17 @@ export const AdashiPage: React.FC = () => {
   return (
     <div className="page-container adashi-page">
       <div className="card-header-between mb-4">
-        <div>
-          <h2>Bitcoin Adashi (Rotating Savings Cooperative)</h2>
-          <p className="card-subtitle">
-            Traditional African ROSCA microfinance upgraded to sound Bitcoin bearer money to defeat inflation.
-          </p>
+        <div className="desktop-page-header">
+          <h2 className="section-heading-clean">Adashi Savings Circles</h2>
         </div>
 
         <button
           type="button"
-          className="btn-primary"
+          className="btn-primary-sm"
           onClick={() => setShowCreateModal(true)}
         >
-          <Plus size={16} />
-          <span>Start New Cooperative Pot</span>
+          <Plus size={15} />
+          <span>New Circle</span>
         </button>
       </div>
 

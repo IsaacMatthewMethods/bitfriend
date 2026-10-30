@@ -7,6 +7,7 @@ import {
   Server,
   Save,
   RefreshCw,
+  LogOut,
 } from 'lucide-react';
 import { useWallet } from '../context/WalletContext';
 import { VaultBackupModal } from '../components/VaultBackupModal';
@@ -15,6 +16,7 @@ import { MintSettingsModal } from '../components/MintSettingsModal';
 import { MultiMintMonitor } from '../components/MultiMintMonitor';
 import { exportVaultBackupFile, parseVaultBackupFile } from '../utils/vaultBackup';
 import { setCustomMint } from '../utils/cashuEngine';
+import { ApiClient } from '../services/apiClient';
 
 export const SettingsPage: React.FC = () => {
   const {
@@ -28,11 +30,13 @@ export const SettingsPage: React.FC = () => {
     setLang,
     soundEnabled,
     setSoundEnabled,
+    signOutWallet,
   } = useWallet();
 
   // Form states
   const [name, setName] = useState<string>(userProfile.name);
   const [lightningAddress, setLightningAddress] = useState<string>(userProfile.lightningAddress);
+  const [serverUrl, setServerUrl] = useState<string>(() => ApiClient.getBaseUrl());
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
 
   // Modals
@@ -45,6 +49,7 @@ export const SettingsPage: React.FC = () => {
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
+    ApiClient.setBaseUrl(serverUrl);
     updateUserProfile({
       name: name.trim() || userProfile.name,
       lightningAddress: lightningAddress.trim() || userProfile.lightningAddress,
@@ -81,22 +86,12 @@ export const SettingsPage: React.FC = () => {
 
   return (
     <div className="page-container settings-page">
-      <div className="card-header-between mb-4">
-        <div>
-          <h2>Security, Keys & Node Configuration</h2>
-          <p className="card-subtitle">
-            Manage your cryptographic master keys, sovereign mint connections, and merchant profile.
-          </p>
-        </div>
-      </div>
-
       <div className="fintech-grid-2col">
         {/* LEFT COLUMN: MERCHANT PROFILE & PREFERENCES */}
         <div className="grid-col-primary">
           {/* Profile Card */}
-          <div className="card mb-4">
-            <h3>Merchant Business Profile</h3>
-            <p className="card-subtitle">Your public merchant identity for offline POS receipts and BitChat.</p>
+          <div className="card">
+            <h3 className="section-heading-clean">Merchant Identity</h3>
 
             <form onSubmit={handleSaveProfile} className="mt-3">
               <div className="input-group-fintech">
@@ -122,7 +117,7 @@ export const SettingsPage: React.FC = () => {
               </div>
 
               <div className="input-group-fintech">
-                <label>Nostr Sovereign Public Key (npub)</label>
+                <label>secp256k1 Sovereign Public Key</label>
                 <input
                   type="text"
                   className="fintech-input mono-num text-xs text-muted"
@@ -131,14 +126,42 @@ export const SettingsPage: React.FC = () => {
                 />
               </div>
 
+              <div className="input-group-fintech">
+                <label>Backend Node API Endpoint</label>
+                <input
+                  type="text"
+                  className="fintech-input mono-num text-xs"
+                  value={serverUrl}
+                  onChange={(e) => setServerUrl(e.target.value)}
+                  placeholder="/api/v1 or https://node.bitfriend.me/api/v1"
+                />
+              </div>
+
               {savedSuccess && (
                 <div className="status-banner success mb-2">Profile updated successfully!</div>
               )}
 
-              <button type="submit" className="btn-primary mt-2">
-                <Save size={16} />
-                <span>Save Profile Updates</span>
-              </button>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                <button type="submit" className="btn-primary" style={{ flex: 1 }}>
+                  <Save size={16} />
+                  <span>Save Profile Updates</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    borderColor: 'rgba(239, 68, 68, 0.35)',
+                    color: '#EF4444',
+                  }}
+                  onClick={() => signOutWallet()}
+                >
+                  <LogOut size={15} />
+                  <span>Switch / Sign Out</span>
+                </button>
+              </div>
             </form>
           </div>
 

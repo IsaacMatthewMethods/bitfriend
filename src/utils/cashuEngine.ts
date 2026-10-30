@@ -1,5 +1,10 @@
 import type { CashuProof, CashuTokenPayload } from '../types';
-import { generateRealCryptoProof } from './cryptoCashu';
+import {
+  generateRealCryptoProof,
+  blindMessageClient,
+  unblindSignatureClient,
+} from './cryptoCashu';
+import { ApiClient } from '../services/apiClient';
 
 export const DEFAULT_MINT = 'https://mint.minibits.cash/Bitcoin';
 export const BTC_TO_NGN_RATE = 158500000; // 1 BTC = ₦158,500,000 (~1 sat = ₦1.585)
@@ -304,6 +309,22 @@ export async function checkProofsState(
 ): Promise<{ states: ProofState[]; liveMint: boolean }> {
   if (proofs.length === 0) return { states: [], liveMint: false };
 
+  // 1. Check BitFriend Backend SQLite Proof Registry first
+  try {
+    const backendStates = await ApiClient.checkProofStates(proofs.map((p) => p.secret));
+    if (Array.isArray(backendStates) && backendStates.length === proofs.length) {
+      return {
+        states: backendStates.map((st, idx) => ({
+          Y: proofs[idx].C,
+          state: st.state === 'SPENT' ? 'SPENT' : st.state === 'PENDING' ? 'PENDING' : 'UNSPENT',
+        })),
+        liveMint: true,
+      };
+    }
+  } catch {
+    // Proceed to external mint or offline check
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 3500);
 
@@ -355,16 +376,60 @@ export async function executeNut03Swap(
   }
 
   const totalAmount = proofsToSwap.reduce((sum, p) => sum + p.amount, 0);
+  const splitAmounts = splitToPowersOfTwo(totalAmount);
+
+  // 1. Primary path: Full BDHKE swap against BitFriend SQLite Enterprise Mint
+  try {
+    const keysetResp = await ApiClient.getMintKeys();
+    const activeKeyset = keysetResp?.keysets?.[0];
+    if (activeKeyset && activeKeyset.keys) {
+      const blindedPayloads = splitAmounts.map((amt) => {
+        const secret = `bf_nut03_${amt}_${Math.random().toString(36).slice(2, 12)}_${Date.now()}`;
+        const { B_, rHex } = blindMessageClient(secret);
+        return {
+          amount: amt,
+          id: activeKeyset.id,
+          secret,
+          rHex,
+          B_,
+        };
+      });
+
+      const swapRes = await ApiClient.swapProofs(
+        proofsToSwap,
+        blindedPayloads.map((b) => ({ amount: b.amount, id: b.id, B_: b.B_ }))
+      );
+
+      if (swapRes && Array.isArray(swapRes.signatures) && swapRes.signatures.length === blindedPayloads.length) {
+        const newProofs: CashuProof[] = swapRes.signatures.map((sig, idx) => {
+          const item = blindedPayloads[idx];
+          const KPubHex = activeKeyset.keys[item.amount] || activeKeyset.keys[String(item.amount)];
+          const C = unblindSignatureClient(sig.C_, item.rHex, KPubHex);
+          return {
+            id: sig.id || item.id,
+            amount: sig.amount,
+            secret: item.secret,
+            C,
+          };
+        });
+        return { success: true, newProofs, liveMint: true };
+      }
+    }
+  } catch (err: any) {
+    // If double-spend was explicitly detected by the SQLite Mint, fail hard!
+    if (err?.message && err.message.includes('Double-spend detected')) {
+      return { success: false, newProofs: [], error: err.message, liveMint: true };
+    }
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 4500);
 
-  // Attempt live swap with primary mint, then failover to secondary mints
+  // 2. Attempt live swap with external mints
   const mintsToTry = [mintUrl, ...PRODUCTION_MINTS.filter(m => m !== mintUrl)];
 
   for (const targetMint of mintsToTry) {
     try {
-      // Split into powers of 2 for fresh blinded outputs
-      const splitAmounts = splitToPowersOfTwo(totalAmount);
       const generatedOutputs = splitAmounts.map(amt => generateProof(amt, targetMint));
 
       const res = await fetch(`${targetMint.replace(/\/+$/, '')}/v1/swap`, {
@@ -401,8 +466,7 @@ export async function executeNut03Swap(
 
   clearTimeout(timeoutId);
 
-  // Local cryptographic re-minting fallback for offline resilience
-  const splitAmounts = splitToPowersOfTwo(totalAmount);
+  // 3. Local cryptographic re-minting fallback for offline resilience
   const freshProofs = splitAmounts.map(amt => generateProof(amt, mintUrl));
 
   return {

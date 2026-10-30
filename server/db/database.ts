@@ -22,6 +22,17 @@ export function initializeDatabase(): void {
   try {
     const schemaSql = fs.readFileSync(SCHEMA_PATH, 'utf-8');
     db.exec(schemaSql);
+
+    // Ensure safe schema column migrations for existing databases
+    const userCols = db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>;
+    const userColNames = new Set(userCols.map(c => c.name));
+    if (!userColNames.has('lightning_address')) {
+      db.exec('ALTER TABLE users ADD COLUMN lightning_address TEXT');
+    }
+    if (!userColNames.has('currency')) {
+      db.exec("ALTER TABLE users ADD COLUMN currency TEXT DEFAULT 'NGN'");
+    }
+
     console.log('[BitFriend DB] Schema tables & indexes verified successfully.');
 
     // Seed production baseline records if table is empty
